@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use failure::{err_msg, Error};
 use nom::{
     branch::alt,
@@ -114,7 +112,17 @@ impl Outcome {
     }
 }
 
-fn outcome(player: Hand, opponent: Hand) -> Outcome {
+impl From<PlayerKey> for Outcome {
+    fn from(player: PlayerKey) -> Self {
+        match player {
+            PlayerKey::X => Outcome::Lose,
+            PlayerKey::Y => Outcome::Draw,
+            PlayerKey::Z => Outcome::Win,
+        }
+    }
+}
+
+fn play_game(player: Hand, opponent: Hand) -> Outcome {
     use Hand::*;
     use Outcome::*;
     match (player, opponent) {
@@ -127,6 +135,22 @@ fn outcome(player: Hand, opponent: Hand) -> Outcome {
         (Scissors, Rock) => Lose,
         (Scissors, Paper) => Win,
         (Scissors, Scissors) => Draw,
+    }
+}
+
+fn pick_hand(opponent: Hand, outcome: Outcome) -> Hand {
+    use Hand::*;
+    use Outcome::*;
+    match (opponent, outcome) {
+        (Rock, Lose) => Scissors,
+        (Rock, Draw) => Rock,
+        (Rock, Win) => Paper,
+        (Paper, Lose) => Rock,
+        (Paper, Draw) => Paper,
+        (Paper, Win) => Scissors,
+        (Scissors, Lose) => Paper,
+        (Scissors, Draw) => Scissors,
+        (Scissors, Win) => Rock,
     }
 }
 
@@ -147,11 +171,23 @@ impl super::Solver for Solver {
             .map(|rule| {
                 let player: Hand = rule.player.into();
                 let opponent: Hand = rule.opponent.into();
-                player.score() + outcome(player, opponent).score()
+                let outcome: Outcome = play_game(player, opponent);
+                player.score() + outcome.score()
             })
             .sum::<u64>()
             .to_string();
 
-        (Some(part_one), None)
+        let part_two = problem
+            .iter()
+            .map(|rule| {
+                let opponent: Hand = rule.opponent.into();
+                let outcome = rule.player.into();
+                let player = pick_hand(opponent, outcome);
+                player.score() + outcome.score()
+            })
+            .sum::<u64>()
+            .to_string();
+
+        (Some(part_one), Some(part_two))
     }
 }
