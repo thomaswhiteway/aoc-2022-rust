@@ -9,3 +9,4 @@ edition = "2021"
 structopt = "0.3.26"
 aocf = { version = "0.1.18", features = ["html_parsing"] }
 failure = "0.1.8"
+nom = "7.1.1"
