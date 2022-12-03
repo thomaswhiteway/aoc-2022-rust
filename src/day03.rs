@@ -1,4 +1,5 @@
 use failure::Error;
+use itertools::Itertools;
 use std::collections::HashSet;
 
 fn find_duplicate(contents: &[char]) -> Option<char> {
@@ -44,6 +45,24 @@ impl super::Solver for Solver {
             .map(score)
             .sum::<u64>()
             .to_string();
-        (Some(part_one), None)
+
+        let part_two = problem
+            .iter()
+            .tuples()
+            .map(|(a, b, c)| {
+                [a, b, c]
+                    .iter()
+                    .map(|contents| contents.iter().cloned().collect::<HashSet<_>>())
+                    .reduce(|x, y| x.intersection(&y).cloned().collect::<HashSet<_>>())
+                    .unwrap()
+                    .iter()
+                    .cloned()
+                    .next()
+                    .unwrap()
+            })
+            .map(score)
+            .sum::<u64>()
+            .to_string();
+        (Some(part_one), Some(part_two))
     }
 }
