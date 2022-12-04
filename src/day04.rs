@@ -45,6 +45,12 @@ impl Assignment {
     fn duplicate(&self) -> bool {
         subset(&self.first, &self.second) || subset(&self.second, &self.first)
     }
+
+    fn overlaps(&self) -> bool {
+        self.first.contains(self.second.start())
+            || self.first.contains(self.second.end())
+            || subset(&self.first, &self.second)
+    }
 }
 
 fn subset(first: &RangeInclusive<u64>, second: &RangeInclusive<u64>) -> bool {
@@ -69,7 +75,12 @@ impl super::Solver for Solver {
             .count()
             .to_string();
 
+        let part_two = assignments
+            .iter()
+            .filter(|assignment| assignment.overlaps())
+            .count()
+            .to_string();
 
-        (Some(part_one), None)
+        (Some(part_one), Some(part_two))
     }
 }
