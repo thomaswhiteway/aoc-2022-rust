@@ -1,6 +1,6 @@
 use failure::Error;
 use itertools::Itertools;
-use std::collections::HashSet;
+use std::{collections::HashSet, hash::Hash};
 
 fn find_duplicate(contents: &[char]) -> Option<char> {
     let first_compartment = contents[..contents.len() / 2]
@@ -23,6 +23,17 @@ fn score(item: char) -> u64 {
         'A'..='Z' => 27 + (item as u64 - 'A' as u64),
         _ => panic!("Unknown item {}", item),
     }
+}
+
+fn intersect_3<T: Eq + Hash + Clone>(a: HashSet<T>, b: HashSet<T>, c: HashSet<T>) -> HashSet<T> {
+    [a, b, c]
+        .into_iter()
+        .reduce(|x, y| x.intersection(&y).cloned().collect::<HashSet<_>>())
+        .unwrap()
+}
+
+fn pick_one<T>(set: HashSet<T>) -> Option<T> {
+    set.into_iter().next()
 }
 
 pub struct Solver {}
@@ -48,18 +59,10 @@ impl super::Solver for Solver {
 
         let part_two = problem
             .iter()
+            .map(|contents| contents.iter().cloned().collect::<HashSet<_>>())
             .tuples()
-            .map(|(a, b, c)| {
-                [a, b, c]
-                    .iter()
-                    .map(|contents| contents.iter().cloned().collect::<HashSet<_>>())
-                    .reduce(|x, y| x.intersection(&y).cloned().collect::<HashSet<_>>())
-                    .unwrap()
-                    .iter()
-                    .cloned()
-                    .next()
-                    .unwrap()
-            })
+            .map(|(a, b, c)| intersect_3(a, b, c))
+            .map(|set| pick_one(set).unwrap())
             .map(score)
             .sum::<u64>()
             .to_string();
