@@ -57,6 +57,13 @@ fn subset(first: &RangeInclusive<u64>, second: &RangeInclusive<u64>) -> bool {
     (first.start() >= second.start()) && (first.end() <= second.end())
 }
 
+fn count_if<T, F>(values: &[T], mut filter: F) -> usize
+where
+    F: FnMut(&T) -> bool,
+{
+    values.iter().filter(|v| filter(*v)).count()
+}
+
 pub struct Solver {}
 
 impl super::Solver for Solver {
@@ -69,17 +76,8 @@ impl super::Solver for Solver {
     }
 
     fn solve(assignments: &Self::Problem) -> (Option<String>, Option<String>) {
-        let part_one = assignments
-            .iter()
-            .filter(|assignment| assignment.duplicate())
-            .count()
-            .to_string();
-
-        let part_two = assignments
-            .iter()
-            .filter(|assignment| assignment.overlaps())
-            .count()
-            .to_string();
+        let part_one = count_if(assignments, Assignment::duplicate).to_string();
+        let part_two = count_if(assignments, Assignment::overlaps).to_string();
 
         (Some(part_one), Some(part_two))
     }
