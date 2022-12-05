@@ -41,17 +41,12 @@ struct Move {
 }
 
 impl Move {
-    fn apply_one(&self, stacks: &mut [Vec<char>]) {
-        for _ in 0..self.num_crates {
-            if let Some(crate_name) = stacks[self.from - 1].pop() {
-                stacks[self.to - 1].push(crate_name)
-            }
-        }
-    }
-
-    fn apply_two(&self, stacks: &mut [Vec<char>]) {
+    fn apply(&self, stacks: &mut [Vec<char>], multi: bool) {
         let from = stacks[self.from - 1].len() - self.num_crates;
-        let moved = stacks[self.from - 1].drain(from..).collect::<Vec<_>>();
+        let mut moved = stacks[self.from - 1].drain(from..).collect::<Vec<_>>();
+        if !multi {
+            moved.reverse();
+        }
         stacks[self.to - 1].extend(moved);
     }
 }
@@ -111,14 +106,14 @@ impl super::Solver for Solver {
     fn solve(problem: Self::Problem) -> (Option<String>, Option<String>) {
         let mut stacks = problem.stacks.clone();
         for crate_move in &problem.moves {
-            crate_move.apply_one(&mut stacks);
+            crate_move.apply(&mut stacks, false);
         }
 
         let part_one = top_of_stacks(&stacks);
 
         let mut stacks = problem.stacks.clone();
         for crate_move in &problem.moves {
-            crate_move.apply_two(&mut stacks);
+            crate_move.apply(&mut stacks, true);
         }
 
         let part_two = top_of_stacks(&stacks);
