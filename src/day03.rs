@@ -49,7 +49,7 @@ impl super::Solver for Solver {
             .into_boxed_slice())
     }
 
-    fn solve(problem: &Self::Problem) -> (Option<String>, Option<String>) {
+    fn solve(problem: Self::Problem) -> (Option<String>, Option<String>) {
         let part_one = problem
             .iter()
             .map(|contents| find_duplicate(contents).unwrap())

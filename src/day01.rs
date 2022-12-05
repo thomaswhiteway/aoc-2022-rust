@@ -26,7 +26,7 @@ impl super::Solver for Solver {
         Ok(elves.into_boxed_slice())
     }
 
-    fn solve(elves: &Self::Problem) -> (Option<String>, Option<String>) {
+    fn solve(elves: Self::Problem) -> (Option<String>, Option<String>) {
         let mut elf_calories = elves
             .iter()
             .map(|elf| elf.iter().sum::<u32>())

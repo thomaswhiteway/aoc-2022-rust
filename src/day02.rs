@@ -165,7 +165,7 @@ impl super::Solver for Solver {
             .map_err(|err| err_msg(format!("Failed to parse rules: {}", err)))
     }
 
-    fn solve(problem: &Self::Problem) -> (Option<String>, Option<String>) {
+    fn solve(problem: Self::Problem) -> (Option<String>, Option<String>) {
         let part_one = problem
             .iter()
             .map(|rule| {

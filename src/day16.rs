@@ -9,7 +9,7 @@ impl super::Solver for Solver {
         Ok(())
     }
 
-    fn solve(_problem: &Self::Problem) -> (Option<String>, Option<String>) {
+    fn solve(_problem: Self::Problem) -> (Option<String>, Option<String>) {
         (None, None)
     }
 }

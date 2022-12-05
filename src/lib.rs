@@ -52,7 +52,7 @@ pub trait Solver {
     type Problem;
 
     fn parse_input(data: &str) -> Result<Self::Problem, Error>;
-    fn solve(problem: &Self::Problem) -> (Option<String>, Option<String>);
+    fn solve(problem: Self::Problem) -> (Option<String>, Option<String>);
 }
 
 fn read_from_server(aoc: &mut Aoc) -> Result<String, Error> {
@@ -69,7 +69,7 @@ pub fn read_input<P: AsRef<Path>>(path: Option<P>, aoc: &mut Aoc) -> Result<Stri
 
 pub fn solve<S: Solver>(data: &str, aoc: &mut Aoc, submit: Option<Part>) -> Result<(), Error> {
     let problem = S::parse_input(data)?;
-    let (part_one, part_two) = S::solve(&problem);
+    let (part_one, part_two) = S::solve(problem);
 
     if let Some(solution) = part_one {
         println!("Part 1: {}", solution);
