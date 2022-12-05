@@ -41,12 +41,18 @@ struct Move {
 }
 
 impl Move {
-    fn apply(&self, stacks: &mut [Vec<char>]) {
+    fn apply_one(&self, stacks: &mut [Vec<char>]) {
         for _ in 0..self.num_crates {
             if let Some(crate_name) = stacks[self.from - 1].pop() {
                 stacks[self.to - 1].push(crate_name)
             }
         }
+    }
+
+    fn apply_two(&self, stacks: &mut [Vec<char>]) {
+        let from = stacks[self.from - 1].len() - self.num_crates;
+        let moved = stacks[self.from - 1].drain(from..).collect::<Vec<_>>();
+        stacks[self.to - 1].extend(moved);
     }
 }
 
@@ -84,6 +90,13 @@ pub struct Problem {
     moves: Vec<Move>,
 }
 
+fn top_of_stacks(stacks: &[Vec<char>]) -> String {
+    stacks
+        .iter()
+        .map(|stack| stack.last().cloned().unwrap_or(' '))
+        .collect()
+}
+
 impl super::Solver for Solver {
     type Problem = Problem;
 
@@ -97,15 +110,19 @@ impl super::Solver for Solver {
 
     fn solve(problem: Self::Problem) -> (Option<String>, Option<String>) {
         let mut stacks = problem.stacks.clone();
-        for crate_move in problem.moves {
-            crate_move.apply(&mut stacks);
+        for crate_move in &problem.moves {
+            crate_move.apply_one(&mut stacks);
         }
 
-        let part_one = stacks
-            .iter()
-            .map(|stack| stack.last().cloned().unwrap_or(' '))
-            .collect();
+        let part_one = top_of_stacks(&stacks);
 
-        (Some(part_one), None)
+        let mut stacks = problem.stacks.clone();
+        for crate_move in &problem.moves {
+            crate_move.apply_two(&mut stacks);
+        }
+
+        let part_two = top_of_stacks(&stacks);
+
+        (Some(part_one), Some(part_two))
     }
 }
