@@ -1,17 +1,26 @@
 use failure::Error;
 
-fn all_different<E: Eq>(values: &[E]) -> bool {
-    (0..values.len()).all(|i| (i + 1..values.len()).all(|j| values[i] != values[j]))
-}
-
 fn find_non_repeating<E: Eq>(values: &[E], len: usize) -> Option<usize> {
-    values.windows(len).enumerate().find_map(|(index, values)| {
-        if all_different(values) {
-            Some(index + len)
-        } else {
-            None
+    let mut current_len = 0;
+    for (i, next) in values.iter().enumerate() {
+        let mut found_dup = false;
+        for j in (i - current_len..i).rev() {
+            if values[j] == *next {
+                current_len = i - j;
+                found_dup = true;
+                break;
+            }
         }
-    })
+        if !found_dup {
+            current_len += 1;
+        }
+
+        if current_len == len {
+            return Some(i + 1);
+        }
+    }
+
+    None
 }
 
 pub struct Solver {}
