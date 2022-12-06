@@ -100,7 +100,7 @@ fn top_of_stacks(stacks: &[Vec<char>]) -> String {
 impl super::Solver for Solver {
     type Problem = Problem;
 
-    fn parse_input(data: &str) -> Result<Self::Problem, Error> {
+    fn parse_input(data: String) -> Result<Self::Problem, Error> {
         let mut lines = data.lines();
         let stacks = read_diagram(&mut lines);
         let moves = read_moves(&mut lines);

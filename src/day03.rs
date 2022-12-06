@@ -41,7 +41,7 @@ pub struct Solver {}
 impl super::Solver for Solver {
     type Problem = Box<[Box<[char]>]>;
 
-    fn parse_input(data: &str) -> Result<Self::Problem, Error> {
+    fn parse_input(data: String) -> Result<Self::Problem, Error> {
         Ok(data
             .lines()
             .map(|line| line.trim().chars().collect::<Vec<_>>().into_boxed_slice())

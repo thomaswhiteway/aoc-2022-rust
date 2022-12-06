@@ -159,8 +159,8 @@ pub struct Solver {}
 impl super::Solver for Solver {
     type Problem = Box<[Rule]>;
 
-    fn parse_input(data: &str) -> Result<Self::Problem, Error> {
-        rules(data)
+    fn parse_input(data: String) -> Result<Self::Problem, Error> {
+        rules(&data)
             .map(|(_, rules)| rules)
             .map_err(|err| err_msg(format!("Failed to parse rules: {}", err)))
     }

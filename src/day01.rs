@@ -5,7 +5,7 @@ pub struct Solver {}
 impl super::Solver for Solver {
     type Problem = Box<[Box<[u32]>]>;
 
-    fn parse_input(data: &str) -> Result<Self::Problem, Error> {
+    fn parse_input(data: String) -> Result<Self::Problem, Error> {
         let (mut elves, last) = data.lines().map(|line| line.parse::<u32>().ok()).fold(
             (vec![], vec![]),
             |(mut elves, mut current), value| {

@@ -51,7 +51,7 @@ impl FromStr for Part {
 pub trait Solver {
     type Problem;
 
-    fn parse_input(data: &str) -> Result<Self::Problem, Error>;
+    fn parse_input(data: String) -> Result<Self::Problem, Error>;
     fn solve(problem: Self::Problem) -> (Option<String>, Option<String>);
 }
 
@@ -67,7 +67,7 @@ pub fn read_input<P: AsRef<Path>>(path: Option<P>, aoc: &mut Aoc) -> Result<Stri
     }
 }
 
-pub fn solve<S: Solver>(data: &str, aoc: &mut Aoc, submit: Option<Part>) -> Result<(), Error> {
+pub fn solve<S: Solver>(data: String, aoc: &mut Aoc, submit: Option<Part>) -> Result<(), Error> {
     let problem = S::parse_input(data)?;
     let (part_one, part_two) = S::solve(problem);
 
@@ -92,7 +92,7 @@ pub fn solve<S: Solver>(data: &str, aoc: &mut Aoc, submit: Option<Part>) -> Resu
     Ok(())
 }
 
-pub fn solve_day(day: u32, data: &str, aoc: &mut Aoc, submit: Option<Part>) -> Result<(), Error> {
+pub fn solve_day(day: u32, data: String, aoc: &mut Aoc, submit: Option<Part>) -> Result<(), Error> {
     match day {
         1 => solve::<day01::Solver>(data, aoc, submit),
         2 => solve::<day02::Solver>(data, aoc, submit),

@@ -69,8 +69,8 @@ pub struct Solver {}
 impl super::Solver for Solver {
     type Problem = Box<[Assignment]>;
 
-    fn parse_input(data: &str) -> Result<Self::Problem, Error> {
-        assignments(data)
+    fn parse_input(data: String) -> Result<Self::Problem, Error> {
+        assignments(&data)
             .map_err(|err| err_msg(format!("Failed to parse assignments: {}", err)))
             .map(|(_, a)| a)
     }

@@ -27,7 +27,7 @@ fn main() -> Result<(), Error> {
     let data = read_input(opt.input, &mut aoc)
         .map_err(|err| failure::err_msg(format!("Failed to read input: {}", err)))?;
 
-    solve_day(opt.day, &data, &mut aoc, opt.submit)?;
+    solve_day(opt.day, data, &mut aoc, opt.submit)?;
 
     Ok(())
 }

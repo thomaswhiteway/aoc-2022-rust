@@ -5,7 +5,7 @@ pub struct Solver {}
 impl super::Solver for Solver {
     type Problem = ();
 
-    fn parse_input(_data: &str) -> Result<Self::Problem, Error> {
+    fn parse_input(_data: String) -> Result<Self::Problem, Error> {
         Ok(())
     }
 
