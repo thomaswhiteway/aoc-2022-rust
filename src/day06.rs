@@ -1,8 +1,17 @@
 use failure::Error;
-use itertools::Itertools;
 
 fn all_different<E: Eq>(values: &[E]) -> bool {
     (0..values.len()).all(|i| (i + 1..values.len()).all(|j| values[i] != values[j]))
+}
+
+fn find_non_repeating<E: Eq>(values: &[E], len: usize) -> Option<usize> {
+    values.windows(len).enumerate().find_map(|(index, values)| {
+        if all_different(values) {
+            Some(index + len)
+        } else {
+            None
+        }
+    })
 }
 
 pub struct Solver {}
@@ -15,17 +24,10 @@ impl super::Solver for Solver {
     }
 
     fn solve(data: Self::Problem) -> (Option<String>, Option<String>) {
-        let part_one =
-            data.chars()
-                .tuple_windows()
-                .enumerate()
-                .find_map(|(index, (a, b, c, d))| {
-                    if all_different(&[a, b, c, d]) {
-                        Some((index + 4).to_string())
-                    } else {
-                        None
-                    }
-                });
-        (part_one, None)
+        let chars = data.chars().collect::<Vec<_>>();
+        let part_one = find_non_repeating(&chars, 4).unwrap().to_string();
+        let part_two = find_non_repeating(&chars, 14).unwrap().to_string();
+
+        (Some(part_one), Some(part_two))
     }
 }
