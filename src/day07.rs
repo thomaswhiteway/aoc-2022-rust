@@ -100,6 +100,30 @@ fn commands(input: &str) -> IResult<&str, Box<[Command]>> {
     map(many1(command), Vec::into_boxed_slice)(input)
 }
 
+fn change_directory<'a, 'b: 'a>(cwd: &mut Vec<&'a str>, dirname: &'b str) {
+    if dirname == ".." {
+        cwd.pop();
+    } else if dirname == "/" {
+        cwd.clear()
+    } else if let Some(relative) = dirname.strip_prefix('/'){
+        *cwd = relative.split('/').collect();
+    } else {
+        cwd.extend(dirname.split('/'));
+    }
+}
+
+fn get_directory_contents<'a>(path: &[&str], root: &'a mut DirectoryEntry) -> &'a mut HashMap<String, DirectoryEntry> {
+    let mut contents = root.dir_contents_mut().unwrap();
+    for dirname in path.iter() {
+        contents = contents
+            .entry(dirname.to_string())
+            .or_insert_with(|| DirectoryEntry::Directory(HashMap::new()))
+            .dir_contents_mut()
+            .unwrap();
+    }
+    contents
+}
+
 fn build_filesystem(commands: &[Command]) -> DirectoryEntry {
     let mut root = DirectoryEntry::Directory(HashMap::new());
     let mut cwd = vec![];
@@ -107,26 +131,10 @@ fn build_filesystem(commands: &[Command]) -> DirectoryEntry {
     for command in commands {
         match command {
             Command::ChangeDirectory(dirname) => {
-                if dirname == ".." {
-                    cwd.pop();
-                } else if dirname == "/" {
-                    cwd = vec![];
-                } else if let Some(relative) = dirname.strip_prefix('/'){
-                    cwd = relative.split('/').collect();
-                } else {
-                    cwd.extend(dirname.split('/'));
-                }
+                change_directory(&mut cwd, dirname);
             }
             Command::ListDirectory(list_output) => {
-                let mut contents = root.dir_contents_mut().unwrap();
-                for dirname in cwd.iter() {
-                    contents = contents
-                        .entry(dirname.to_string())
-                        .or_insert_with(|| DirectoryEntry::Directory(HashMap::new()))
-                        .dir_contents_mut()
-                        .unwrap();
-                }
-
+                let contents = get_directory_contents(&cwd, &mut root);
                 for entry in list_output.iter() {
                     let (name, data) = match entry {
                         ListEntry::File(name, size) => (name.clone(), DirectoryEntry::File(*size)),
