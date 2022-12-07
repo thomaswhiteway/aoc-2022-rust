@@ -5,7 +5,7 @@ use nom::{
     character::complete::newline,
     combinator::{map, map_res},
     multi::many1,
-    sequence::{delimited, preceded, terminated, separated_pair},
+    sequence::{delimited, preceded, separated_pair, terminated},
     IResult,
 };
 use std::collections::HashMap;
@@ -51,14 +51,13 @@ pub enum Command {
 }
 
 fn basename(input: &str) -> IResult<&str, String> {
-    map(
-        take_while1(|c: char| !c.is_whitespace()),
-        |name: &str| name.to_string(),
-    )(input)
+    map(take_while1(|c: char| !c.is_whitespace()), |name: &str| {
+        name.to_string()
+    })(input)
 }
 
 fn filesize(input: &str) -> IResult<&str, usize> {
-    map_res(take_while1(|c: char| c.is_digit(10)), |size: &str| {
+    map_res(take_while1(|c: char| c.is_ascii_digit()), |size: &str| {
         size.parse()
     })(input)
 }
@@ -68,9 +67,10 @@ fn directory_entry(input: &str) -> IResult<&str, ListEntry> {
 }
 
 fn file_entry(input: &str) -> IResult<&str, ListEntry> {
-    map(separated_pair(filesize, tag(" "), basename), |(size, name)| {
-        ListEntry::File(name, size)
-    })(input)
+    map(
+        separated_pair(filesize, tag(" "), basename),
+        |(size, name)| ListEntry::File(name, size),
+    )(input)
 }
 
 fn entry(input: &str) -> IResult<&str, ListEntry> {
@@ -111,10 +111,10 @@ fn build_filesystem(commands: &[Command]) -> DirectoryEntry {
                     cwd.pop();
                 } else if dirname == "/" {
                     cwd = vec![];
-                } else if dirname.starts_with("/") {
-                    cwd = dirname[1..].split("/").collect();
+                } else if let Some(relative) = dirname.strip_prefix('/'){
+                    cwd = relative.split('/').collect();
                 } else {
-                    cwd.extend(dirname.split("/"));
+                    cwd.extend(dirname.split('/'));
                 }
             }
             Command::ListDirectory(list_output) => {
@@ -171,14 +171,13 @@ fn get_directory_sizes(filesystem: &HashMap<String, DirectoryEntry>) -> Director
 
 fn find_directory_sizes<F>(dir_sizes: &DirectorySizeEntry, filter: F) -> Vec<usize>
 where
-    F: Fn(&DirectorySizeEntry) -> bool,
+    F: Fn(&str, &DirectorySizeEntry) -> bool,
 {
     let mut stack = vec![("/".to_string(), dir_sizes)];
     let mut sizes = vec![];
 
     while let Some((path, directory)) = stack.pop() {
-        println!("{} {}", path, directory.size);
-        if filter(directory) {
+        if filter(&path, directory) {
             sizes.push(directory.size);
         }
 
@@ -210,10 +209,17 @@ impl super::Solver for Solver {
     fn solve(commands: Self::Problem) -> (Option<String>, Option<String>) {
         let filesystem = build_filesystem(&commands);
         let dir_sizes = get_directory_sizes(filesystem.dir_contents().unwrap());
-        let part_one = find_directory_sizes(&dir_sizes, |dir| dir.size <= 100_000)
+        let part_one = find_directory_sizes(&dir_sizes, |_, dir| dir.size <= 100_000)
             .iter()
             .sum::<usize>();
-        (Some(part_one.to_string()), None)
+
+        let needed_size = 30_000_000 - (70_000_000 - dir_sizes.size);
+        let part_two = find_directory_sizes(&dir_sizes, |_, dir| dir.size >= needed_size)
+            .iter()
+            .min()
+            .unwrap()
+            .to_string();
+        (Some(part_one.to_string()), Some(part_two))
     }
 }
 
@@ -224,28 +230,38 @@ mod test {
     #[test]
     fn test_parse_ls() {
         let data = "$ ls\n268495 jgfbgjdb\ndir ltcqgnc\n272455 pct.bbd\n200036 phthcq\n174378 qld\ndir rbmstsf\n130541 trhbvp.fmm\ndir twjcmp\n";
-        assert_eq!(command(data), Ok(("", Command::ListDirectory(Box::new([
-            ListEntry::File("jgfbgjdb".to_string(), 268495),
-            ListEntry::Directory("ltcqgnc".to_string()),
-            ListEntry::File("pct.bbd".to_string(), 272455),
-            ListEntry::File("phthcq".to_string(), 200036),
-            ListEntry::File("qld".to_string(), 174378),
-            ListEntry::Directory("rbmstsf".to_string()),
-            ListEntry::File("trhbvp.fmm".to_string(), 130541),
-            ListEntry::Directory("twjcmp".to_string()),
-        ])))));
-
+        assert_eq!(
+            command(data),
+            Ok((
+                "",
+                Command::ListDirectory(Box::new([
+                    ListEntry::File("jgfbgjdb".to_string(), 268495),
+                    ListEntry::Directory("ltcqgnc".to_string()),
+                    ListEntry::File("pct.bbd".to_string(), 272455),
+                    ListEntry::File("phthcq".to_string(), 200036),
+                    ListEntry::File("qld".to_string(), 174378),
+                    ListEntry::Directory("rbmstsf".to_string()),
+                    ListEntry::File("trhbvp.fmm".to_string(), 130541),
+                    ListEntry::Directory("twjcmp".to_string()),
+                ]))
+            ))
+        );
     }
 
     #[test]
     fn test_parse_ls_example() {
         let data = "$ ls\n4060174 j\n8033020 d.log\n5626152 d.ext\n7214296 k\n";
-        assert_eq!(command(data), Ok(("", Command::ListDirectory(Box::new([
-            ListEntry::File("j".to_string(), 4060174),
-            ListEntry::File("d.log".to_string(), 8033020),
-            ListEntry::File("d.ext".to_string(), 5626152),
-            ListEntry::File("k".to_string(), 7214296),
-        ])))));
-
+        assert_eq!(
+            command(data),
+            Ok((
+                "",
+                Command::ListDirectory(Box::new([
+                    ListEntry::File("j".to_string(), 4060174),
+                    ListEntry::File("d.log".to_string(), 8033020),
+                    ListEntry::File("d.ext".to_string(), 5626152),
+                    ListEntry::File("k".to_string(), 7214296),
+                ]))
+            ))
+        );
     }
 }

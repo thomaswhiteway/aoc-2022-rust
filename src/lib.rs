@@ -61,7 +61,7 @@ fn read_from_server(aoc: &mut Aoc) -> Result<String, Error> {
 
 pub fn read_input<P: AsRef<Path>>(path: Option<P>, aoc: &mut Aoc) -> Result<String, Error> {
     if let Some(path) = &path {
-        Ok(read_to_string(path)?.to_string())
+        Ok(read_to_string(path)?)
     } else {
         read_from_server(aoc)
     }
