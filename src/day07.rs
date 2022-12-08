@@ -105,14 +105,17 @@ fn change_directory<'a, 'b: 'a>(cwd: &mut Vec<&'a str>, dirname: &'b str) {
         cwd.pop();
     } else if dirname == "/" {
         cwd.clear()
-    } else if let Some(relative) = dirname.strip_prefix('/'){
+    } else if let Some(relative) = dirname.strip_prefix('/') {
         *cwd = relative.split('/').collect();
     } else {
         cwd.extend(dirname.split('/'));
     }
 }
 
-fn get_directory_contents<'a>(path: &[&str], root: &'a mut DirectoryEntry) -> &'a mut HashMap<String, DirectoryEntry> {
+fn get_directory_contents<'a>(
+    path: &[&str],
+    root: &'a mut DirectoryEntry,
+) -> &'a mut HashMap<String, DirectoryEntry> {
     let mut contents = root.dir_contents_mut().unwrap();
     for dirname in path.iter() {
         contents = contents
