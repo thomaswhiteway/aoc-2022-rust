@@ -98,17 +98,19 @@ fn move_tail(tail_position: &mut Position, head_position: Position) {
     };
 }
 
-fn all_tail_positions(moves: &[Move]) -> HashSet<Position> {
+fn all_tail_positions(moves: &[Move], length: usize) -> HashSet<Position> {
+    let mut positions = repeat_n(Position::default(), length).collect::<Vec<_>>();
     let mut tail_positions = HashSet::new();
-    let mut head_position = Position::default();
-    let mut tail_position = Position::default();
 
-    tail_positions.insert(tail_position);
+    tail_positions.insert(*positions.last().unwrap());
 
     for direction in expand(moves) {
-        move_head(&mut head_position, direction);
-        move_tail(&mut tail_position, head_position);
-        tail_positions.insert(tail_position);
+        move_head(&mut positions[0], direction);
+        for index in 1..length {
+            let last_position = positions[index - 1];
+            move_tail(&mut positions[index], last_position);
+        }
+        tail_positions.insert(*positions.last().unwrap());
     }
 
     tail_positions
@@ -126,8 +128,9 @@ impl super::Solver for Solver {
     }
 
     fn solve(moves: Self::Problem) -> (Option<String>, Option<String>) {
-        let part_one = all_tail_positions(&moves).len().to_string();
+        let part_one = all_tail_positions(&moves, 2).len().to_string();
+        let part_two = all_tail_positions(&moves, 10).len().to_string();
 
-        (Some(part_one), None)
+        (Some(part_one), Some(part_two))
     }
 }
