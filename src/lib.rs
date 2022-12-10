@@ -67,12 +67,20 @@ pub fn read_input<P: AsRef<Path>>(path: Option<P>, aoc: &mut Aoc) -> Result<Stri
     }
 }
 
+fn display_solution(part: usize, solution: &str) {
+    if solution.contains('\n') {
+        println!("Part {}:\n{}", part, solution);
+    } else {
+        println!("Part {}: {}", part, solution);
+    }
+}
+
 pub fn solve<S: Solver>(data: String, aoc: &mut Aoc, submit: Option<Part>) -> Result<(), Error> {
     let problem = S::parse_input(data)?;
     let (part_one, part_two) = S::solve(problem);
 
     if let Some(solution) = part_one {
-        println!("Part 1: {}", solution);
+        display_solution(1, &solution);
 
         if submit == Some(Part::One) {
             let outcome = (*aoc).submit(&solution)?;
@@ -81,7 +89,7 @@ pub fn solve<S: Solver>(data: String, aoc: &mut Aoc, submit: Option<Part>) -> Re
     }
 
     if let Some(solution) = part_two {
-        println!("Part 2: {}", solution);
+        display_solution(2, &solution);
 
         if submit == Some(Part::Two) {
             let outcome = aoc.submit(&solution)?;

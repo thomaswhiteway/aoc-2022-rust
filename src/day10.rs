@@ -1,5 +1,5 @@
 use failure::{err_msg, Error};
-use itertools::Either;
+use itertools::{chain, Either, Itertools};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -54,6 +54,38 @@ fn as_single_cycle(commands: &[Command]) -> impl Iterator<Item = Command> + '_ {
     })
 }
 
+struct Screen<const W: usize, const H: usize> {
+    pixels: [[char; W]; H],
+}
+
+impl<const W: usize, const H: usize> Default for Screen<W, H> {
+    fn default() -> Self {
+        Screen {
+            pixels: [[' '; W]; H],
+        }
+    }
+}
+
+impl<const W: usize, const H: usize> Screen<W, H> {
+    fn get_draw_position(&self, cycle: i64) -> (usize, usize) {
+        let index = cycle as usize - 1;
+        let x = index % W;
+        let y = (index / W) % H;
+        (x, y)
+    }
+
+    fn render(&self) -> String {
+        self.pixels
+            .iter()
+            .map(|row| row.iter().collect::<String>())
+            .join("\n")
+    }
+
+    fn set_pixel(&mut self, (x, y): (usize, usize), pixel: char) {
+        self.pixels[y][x] = pixel;
+    }
+}
+
 fn signal_strength(cycle: i64, x: i64) -> i64 {
     cycle * x
 }
@@ -62,12 +94,18 @@ fn record_signal_strength(cycle: i64) -> bool {
     (cycle - 20) % 40 == 0
 }
 
-fn total_signal_strength(commands: &[Command]) -> i64 {
-    (2..)
-        .zip(as_single_cycle(commands).scan(1, |x, command| {
+fn positions(commands: &[Command]) -> impl Iterator<Item = (i64, i64)> + '_ {
+    chain(
+        [(1, 1)],
+        (2..).zip(as_single_cycle(commands).scan(1, |x, command| {
             command.apply(x);
             Some(*x)
-        }))
+        })),
+    )
+}
+
+fn total_signal_strength(commands: &[Command]) -> i64 {
+    positions(commands)
         .filter_map(|(cycle, x)| {
             if record_signal_strength(cycle) {
                 Some(signal_strength(cycle, x))
@@ -76,6 +114,17 @@ fn total_signal_strength(commands: &[Command]) -> i64 {
             }
         })
         .sum()
+}
+
+fn draw_screen(commands: &[Command]) -> String {
+    let mut screen = Screen::<40, 6>::default();
+    for (cycle, position) in positions(commands) {
+        let draw_position = screen.get_draw_position(cycle);
+        if (draw_position.0 as i64).abs_diff(position) <= 1 {
+            screen.set_pixel(draw_position, '#');
+        }
+    }
+    screen.render()
 }
 
 pub struct Solver {}
@@ -91,6 +140,7 @@ impl super::Solver for Solver {
 
     fn solve(commands: Self::Problem) -> (Option<String>, Option<String>) {
         let part_one = total_signal_strength(&commands).to_string();
-        (Some(part_one), None)
+        let part_two = draw_screen(&commands);
+        (Some(part_one), Some(part_two))
     }
 }
