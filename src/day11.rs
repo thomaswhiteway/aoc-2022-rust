@@ -9,7 +9,7 @@ mod parse {
         branch::alt,
         bytes::complete::{tag, take_while1},
         combinator::{all_consuming, map, map_res, value},
-        multi::{separated_list1},
+        multi::separated_list1,
         sequence::{delimited, preceded, tuple},
         IResult,
     };
@@ -59,15 +59,14 @@ mod parse {
 
     fn monkey(input: &str) -> IResult<&str, Monkey> {
         map(
-                tuple((
-                    delimited(tag("Monkey "), unsigned, tag(":\n")),
-                    delimited(tag("  Starting items: "), items, tag("\n")),
-                    delimited(tag("  Operation: "), operation, tag("\n")),
-                    delimited(tag("  Test: "), test_divisible, tag("\n")),
-                    delimited(tag("    If true: "), throw, tag("\n")),
-                    delimited(tag("    If false: "), throw, tag("\n")),
-                )),
-
+            tuple((
+                delimited(tag("Monkey "), unsigned, tag(":\n")),
+                delimited(tag("  Starting items: "), items, tag("\n")),
+                delimited(tag("  Operation: "), operation, tag("\n")),
+                delimited(tag("  Test: "), test_divisible, tag("\n")),
+                delimited(tag("    If true: "), throw, tag("\n")),
+                delimited(tag("    If false: "), throw, tag("\n")),
+            )),
             |(index, items, operation, test_divisible, test_pass_throw, test_fail_throw)| Monkey {
                 index,
                 items,
@@ -105,13 +104,18 @@ pub struct Monkey {
 }
 
 impl Monkey {
-    fn take_turn(&mut self) -> Vec<Throw> {
+    fn take_turn(&mut self, reduce_worry: bool, modulo: u64) -> Vec<Throw> {
         self.inspections += self.items.len();
         self.items
             .drain(..)
             .map(|mut worry_level| {
                 worry_level = self.operation.apply(worry_level);
-                worry_level /= 3;
+
+                if reduce_worry {
+                    worry_level /= 3;
+                }
+
+                worry_level %= modulo;
 
                 let monkey = if worry_level % self.test_divisible == 0 {
                     self.test_pass_throw
@@ -168,33 +172,55 @@ struct Throw {
     item: u64,
 }
 
-fn execute_round(monkeys: &mut [Monkey]) {
-    for index in 0..monkeys.len() {
-        for throw in monkeys[index].take_turn() {
-            monkeys[throw.monkey].catch(throw.item);
+struct Executor {
+    monkeys: Box<[Monkey]>,
+    reduce_worry: bool,
+    modulo: u64,
+}
+
+impl Executor {
+    fn new(monkeys: Box<[Monkey]>, reduce_worry: bool) -> Self {
+        let modulo = monkeys.iter().map(|monkey| monkey.test_divisible).product();
+        Executor {
+            monkeys,
+            reduce_worry,
+            modulo,
         }
     }
-}
 
-fn execute(monkeys: &mut [Monkey], rounds: usize) {
-    for _ in 0..rounds {
-        execute_round(monkeys)
+    fn execute_round(&mut self) {
+        for index in 0..self.monkeys.len() {
+            for throw in self.monkeys[index].take_turn(self.reduce_worry, self.modulo) {
+                self.monkeys[throw.monkey].catch(throw.item);
+            }
+        }
+    }
+
+    fn execute(&mut self, rounds: usize) {
+        for _ in 0..rounds {
+            self.execute_round()
+        }
+    }
+
+    fn count_inspections(&self) -> Box<[usize]> {
+        self.monkeys
+            .iter()
+            .map(|monkey| monkey.inspections)
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
+    }
+
+    fn get_monkey_business(&self) -> usize {
+        let mut num_inspections = self.count_inspections();
+        num_inspections.sort_unstable_by(|a, b| a.cmp(b).reverse());
+        num_inspections[0] * num_inspections[1]
     }
 }
 
-fn count_inspections(monkeys: &[Monkey]) -> Box<[usize]> {
-    monkeys
-        .iter()
-        .map(|monkey| monkey.inspections)
-        .collect::<Vec<_>>()
-        .into_boxed_slice()
-}
-
-fn get_monkey_business(monkeys: &mut [Monkey], rounds: usize) -> usize {
-    execute(monkeys, rounds);
-    let mut num_inspections = count_inspections(monkeys);
-    num_inspections.sort_unstable_by(|a, b| a.cmp(b).reverse());
-    num_inspections[0] * num_inspections[1]
+fn get_monkey_business(monkeys: Box<[Monkey]>, reduce_worry: bool, rounds: usize) -> usize {
+    let mut executor = Executor::new(monkeys, reduce_worry);
+    executor.execute(rounds);
+    executor.get_monkey_business()
 }
 
 pub struct Solver {}
@@ -216,8 +242,8 @@ impl super::Solver for Solver {
     }
 
     fn solve(monkeys: Self::Problem) -> (Option<String>, Option<String>) {
-        let mut monkeys_one = monkeys.clone();
-        let part_one = get_monkey_business(&mut monkeys_one, 20).to_string();
-        (Some(part_one), None)
+        let part_one = get_monkey_business(monkeys.clone(), true, 20).to_string();
+        let part_two = get_monkey_business(monkeys, false, 10000).to_string();
+        (Some(part_one), Some(part_two))
     }
 }
