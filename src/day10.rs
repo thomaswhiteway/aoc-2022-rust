@@ -36,13 +36,11 @@ mod parse {
     }
 
     pub fn parse_input(input: &str) -> Result<Box<[Command]>, Error> {
-        all_consuming(commands)(&input)
+        all_consuming(commands)(input)
             .map_err(|err| err_msg(format!("Failed to parse commands: {}", err)))
             .map(|(_, commands)| commands)
     }
-
 }
-
 
 use failure::Error;
 use itertools::{chain, Either, Itertools};

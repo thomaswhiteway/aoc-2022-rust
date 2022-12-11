@@ -39,7 +39,7 @@ mod parse {
     }
 
     pub fn parse_input(input: &str) -> Result<Box<[Move]>, Error> {
-        all_consuming(moves)(&input)
+        all_consuming(moves)(input)
             .map_err(|err| err_msg(format!("Failed to parse moves: {}", err)))
             .map(|(_, moves)| moves)
     }
