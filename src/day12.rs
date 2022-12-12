@@ -121,7 +121,7 @@ impl<'a> Hash for State<'a> {
 impl<'a> a_star::State for State<'a> {
     fn heuristic(&self) -> u64 {
         return (self.height_map.heights.get(&self.height_map.end).unwrap()
-        - self.height_map.heights.get(&self.position).unwrap()) as u64;
+            - self.height_map.heights.get(&self.position).unwrap()) as u64;
         // TODO: Figure out why this doesn't work
         max(
             self.position.manhattan_distance_to(&self.height_map.end),
@@ -175,13 +175,7 @@ fn display_route<'a>(height_map: &HeightMap, route: Vec<State<'a>>) {
                 directions
                     .get(&position)
                     .map(|dir| dir.as_char())
-                    .or_else(|| {
-                        height_map
-                            .heights
-                            .get(&position)
-                            .cloned()
-                            .map(height_char)
-                    })
+                    .or_else(|| height_map.heights.get(&position).cloned().map(height_char))
                     .unwrap_or(' ')
             })
             .collect();
@@ -189,12 +183,26 @@ fn display_route<'a>(height_map: &HeightMap, route: Vec<State<'a>>) {
     }
 }
 
-fn find_shortest_route(height_map: &HeightMap) -> Option<u64> {
-    let start = State::new(height_map, height_map.start.into());
+fn find_shortest_route_from(height_map: &HeightMap, start: Position) -> Option<u64> {
+    let start = State::new(height_map, start);
     let end = State::new(height_map, height_map.end.into());
-    let (distance, route) = a_star::solve(start, end)?;
-    display_route(height_map, route);
+    let (distance, _route) = a_star::solve(start, end)?;
     Some(distance)
+}
+
+fn all_start_points(height_map: &HeightMap) -> Vec<Position> {
+    height_map
+        .heights
+        .iter()
+        .filter_map(|(position, height)| if *height == 0 { Some(*position) } else { None })
+        .collect()
+}
+
+fn find_shortest_route(height_map: &HeightMap, starts: Vec<Position>) -> Option<u64> {
+    starts
+        .into_iter()
+        .filter_map(|start| find_shortest_route_from(height_map, start))
+        .min()
 }
 
 pub struct Solver {}
@@ -207,9 +215,13 @@ impl super::Solver for Solver {
     }
 
     fn solve(height_map: Self::Problem) -> (Option<String>, Option<String>) {
-        let part_one = find_shortest_route(&height_map)
+        let part_one = find_shortest_route(&height_map, vec![height_map.start])
             .expect("Failed to solve part one")
             .to_string();
-        (Some(part_one), None)
+
+        let part_two = find_shortest_route(&height_map, all_start_points(&height_map))
+            .expect("Failed to solve part one")
+            .to_string();
+        (Some(part_one), Some(part_two))
     }
 }
