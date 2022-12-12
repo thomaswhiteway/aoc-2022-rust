@@ -4,6 +4,8 @@ use std::fs::read_to_string;
 use std::path::Path;
 use std::str::FromStr;
 
+mod a_star;
+mod common;
 mod day01;
 mod day02;
 mod day03;

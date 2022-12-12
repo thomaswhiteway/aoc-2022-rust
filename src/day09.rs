@@ -47,6 +47,7 @@ mod parse {
 
 use std::{cmp::Ordering, collections::HashSet};
 
+use crate::common::Position;
 use failure::Error;
 use itertools::{chain, repeat_n};
 use parse::parse_input;
@@ -69,12 +70,6 @@ impl Move {
     fn expand(&self) -> impl Iterator<Item = Direction> {
         repeat_n(self.direction, self.distance)
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-struct Position {
-    x: i64,
-    y: i64,
 }
 
 #[derive(Clone, Debug)]

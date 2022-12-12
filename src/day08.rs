@@ -1,20 +1,6 @@
+use crate::common::Direction;
 use failure::{err_msg, Error};
 use itertools::iproduct;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Direction {
-    North,
-    East,
-    South,
-    West,
-}
-
-impl Direction {
-    fn all() -> impl Iterator<Item = Self> {
-        use Direction::*;
-        [North, East, South, West].into_iter()
-    }
-}
 
 pub struct HeightMap {
     heights: Box<[Box<[u32]>]>,
