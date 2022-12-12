@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{cmp::max, collections::HashMap, fmt::Debug, hash::Hash, str::FromStr};
 
 use crate::a_star;
@@ -8,7 +9,9 @@ pub struct HeightMap {
     heights: HashMap<Position, u8>,
     start: Position,
     end: Position,
+    #[allow(unused)]
     top_left: Position,
+    #[allow(unused)]
     bottom_right: Position,
 }
 
@@ -34,7 +37,7 @@ fn get_height(h: char) -> Result<u8, Error> {
         _ => return Err(err_msg(format!("Invalid height {}", h))),
     };
 
-    Ok(actual_h as u8 - 'a' as u8)
+    Ok(actual_h as u8 - b'a')
 }
 
 fn is_start(h: char) -> bool {
@@ -121,8 +124,9 @@ impl<'a> Hash for State<'a> {
 impl<'a> a_star::State for State<'a> {
     fn heuristic(&self) -> u64 {
         return (self.height_map.heights.get(&self.height_map.end).unwrap()
-            - self.height_map.heights.get(&self.position).unwrap()) as u64;
+        - self.height_map.heights.get(&self.position).unwrap()) as u64;
         // TODO: Figure out why this doesn't work
+        #[allow(unreachable_code)]
         max(
             self.position.manhattan_distance_to(&self.height_map.end),
             (self.height_map.heights.get(&self.height_map.end).unwrap()
@@ -153,17 +157,19 @@ impl<'a> a_star::State for State<'a> {
     }
 }
 
+#[allow(unused)]
 fn height_char(height: u8) -> char {
-    ('a' as u8 + height) as char
+    (b'a' + height) as char
 }
 
-fn display_route<'a>(height_map: &HeightMap, route: Vec<State<'a>>) {
+#[allow(unused)]
+fn display_route(height_map: &HeightMap, route: Vec<State<'_>>) {
     let directions: HashMap<Position, Direction> = route
         .iter()
         .zip(route.iter().skip(1))
         .map(|(state, next_state)| {
             (
-                state.position.clone(),
+                state.position,
                 state.position.direction_to(&next_state.position).unwrap(),
             )
         })
@@ -183,11 +189,11 @@ fn display_route<'a>(height_map: &HeightMap, route: Vec<State<'a>>) {
     }
 }
 
-fn find_shortest_route_from(height_map: &HeightMap, start: Position) -> Option<u64> {
+fn find_shortest_route_from(height_map: &HeightMap, start: Position) -> Result<u64, HashSet<Position>> {
     let start = State::new(height_map, start);
-    let end = State::new(height_map, height_map.end.into());
-    let (distance, _route) = a_star::solve(start, end)?;
-    Some(distance)
+    let end = State::new(height_map, height_map.end);
+
+    a_star::solve(start, end).map(|(distance, _route)| distance).map_err(|visited| visited.into_iter().map(|state| state.position).collect())
 }
 
 fn all_start_points(height_map: &HeightMap) -> Vec<Position> {
@@ -198,11 +204,23 @@ fn all_start_points(height_map: &HeightMap) -> Vec<Position> {
         .collect()
 }
 
-fn find_shortest_route(height_map: &HeightMap, starts: Vec<Position>) -> Option<u64> {
-    starts
-        .into_iter()
-        .filter_map(|start| find_shortest_route_from(height_map, start))
-        .min()
+fn find_shortest_route(height_map: &HeightMap, mut starts: Vec<Position>) -> Option<u64> {
+    let mut best = None;
+
+    while let Some(start) = starts.pop() {
+        match find_shortest_route_from(height_map, start) {
+            Ok(distance) => {
+                if best.map(|best| distance < best).unwrap_or(true) {
+                    best = Some(distance)
+                }
+            },
+            Err(visited) => {
+                starts.retain(|start| !visited.contains(start));
+            }
+        }
+    }
+
+    best
 }
 
 pub struct Solver {}
@@ -222,6 +240,7 @@ impl super::Solver for Solver {
         let part_two = find_shortest_route(&height_map, all_start_points(&height_map))
             .expect("Failed to solve part one")
             .to_string();
+
         (Some(part_one), Some(part_two))
     }
 }

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Position {
     pub x: i64,

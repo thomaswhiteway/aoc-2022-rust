@@ -47,7 +47,7 @@ impl<S: State> Hash for Entry<S> {
     }
 }
 
-pub fn solve<S: State + Clone + Debug>(start: S, end: S) -> Option<(u64, Vec<S>)> {
+pub fn solve<S: State + Clone + Debug>(start: S, end: S) -> Result<(u64, Vec<S>), HashSet<S>> {
     let mut queue = PriorityQueue::new();
     let entry = Entry {
         cost: 0,
@@ -61,7 +61,7 @@ pub fn solve<S: State + Clone + Debug>(start: S, end: S) -> Option<(u64, Vec<S>)
 
     while let Some((Entry { cost, state, route }, _)) = queue.pop() {
         if state == end {
-            return Some((cost, route));
+            return Ok((cost, route));
         }
 
         visited.insert(state.clone());
@@ -84,5 +84,5 @@ pub fn solve<S: State + Clone + Debug>(start: S, end: S) -> Option<(u64, Vec<S>)
         }
     }
 
-    None
+    Err(visited)
 }
