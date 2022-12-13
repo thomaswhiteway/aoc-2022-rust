@@ -31,6 +31,7 @@ mod day22;
 mod day23;
 mod day24;
 mod day25;
+mod parsers;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Part {

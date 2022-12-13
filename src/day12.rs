@@ -124,7 +124,7 @@ impl<'a> Hash for State<'a> {
 impl<'a> a_star::State for State<'a> {
     fn heuristic(&self) -> u64 {
         return (self.height_map.heights.get(&self.height_map.end).unwrap()
-        - self.height_map.heights.get(&self.position).unwrap()) as u64;
+            - self.height_map.heights.get(&self.position).unwrap()) as u64;
         // TODO: Figure out why this doesn't work
         #[allow(unreachable_code)]
         max(
@@ -189,11 +189,16 @@ fn display_route(height_map: &HeightMap, route: Vec<State<'_>>) {
     }
 }
 
-fn find_shortest_route_from(height_map: &HeightMap, start: Position) -> Result<u64, HashSet<Position>> {
+fn find_shortest_route_from(
+    height_map: &HeightMap,
+    start: Position,
+) -> Result<u64, HashSet<Position>> {
     let start = State::new(height_map, start);
     let end = State::new(height_map, height_map.end);
 
-    a_star::solve(start, end).map(|(distance, _route)| distance).map_err(|visited| visited.into_iter().map(|state| state.position).collect())
+    a_star::solve(start, end)
+        .map(|(distance, _route)| distance)
+        .map_err(|visited| visited.into_iter().map(|state| state.position).collect())
 }
 
 fn all_start_points(height_map: &HeightMap) -> Vec<Position> {
@@ -213,7 +218,7 @@ fn find_shortest_route(height_map: &HeightMap, mut starts: Vec<Position>) -> Opt
                 if best.map(|best| distance < best).unwrap_or(true) {
                     best = Some(distance)
                 }
-            },
+            }
             Err(visited) => {
                 starts.retain(|start| !visited.contains(start));
             }
