@@ -61,9 +61,9 @@ impl Sensor {
         x_range: RangeInclusive<i64>,
     ) -> Option<RangeInclusive<i64>> {
         let radius = self.position.manhattan_distance_to(&self.beacon) as i64;
-        let dy = y - self.position.y;
-        let min_x = self.position.x - radius + dy.abs();
-        let max_x = self.position.x + radius - dy.abs();
+        let dy = y.abs_diff(self.position.y) as i64;
+        let min_x = self.position.x - radius + dy;
+        let max_x = self.position.x + radius - dy;
         if min_x <= max_x {
             intersect(min_x..=max_x, x_range)
         } else {
@@ -105,17 +105,15 @@ fn scanned_ranges_on_row(
     sensors: &[Sensor],
     y: i64,
     x_range: RangeInclusive<i64>,
-) -> Vec<RangeInclusive<i64>> {
-    let mut ranges = sensors
+) -> impl Iterator<Item = RangeInclusive<i64>> + '_ {
+    sensors
         .iter()
-        .filter_map(|sensor| sensor.empty_range_on_row(y, x_range.clone()))
-        .collect::<Vec<_>>();
-    collapse_ranges(&mut ranges);
-    ranges
+        .filter_map(move |sensor| sensor.empty_range_on_row(y, x_range.clone()))
 }
 
 fn count_empty_spaces_on_row(sensors: &[Sensor], y: i64) -> usize {
-    let ranges = scanned_ranges_on_row(sensors, y, i64::MIN..=i64::MAX);
+    let mut ranges = scanned_ranges_on_row(sensors, y, i64::MIN..=i64::MAX).collect::<Vec<_>>();
+    collapse_ranges(&mut ranges);
     let num_beacons = count_beacons_on_row(sensors, y);
     ranges
         .iter()
@@ -124,22 +122,33 @@ fn count_empty_spaces_on_row(sensors: &[Sensor], y: i64) -> usize {
         - num_beacons
 }
 
-fn find_beacon(
+fn empty_space_on_row(
     sensors: &[Sensor],
+    y: i64,
     x_range: RangeInclusive<i64>,
-    y_range: RangeInclusive<i64>,
 ) -> Option<Position> {
-    for y in y_range {
-        let ranges = scanned_ranges_on_row(sensors, y, x_range.clone());
-        if ranges != vec![x_range.clone()] {
-            for x in x_range.clone() {
-                if ranges.iter().all(|range| !range.contains(&x)) {
-                    return Some(Position { x, y });
-                }
-            }
+    let mut ranges = scanned_ranges_on_row(sensors, y, x_range.clone()).collect::<Vec<_>>();
+    ranges.sort_by_key(|range| (*range.start(), *range.end()));
+    let mut next = *x_range.start();
+    for range in ranges {
+        if next < *range.start() {
+            return Some(Position { x: next, y });
+        } else if next <= *range.end() {
+            next = *range.end() + 1;
+        }
+        if next > *x_range.end() {
+            break;
         }
     }
     None
+}
+
+fn find_beacon(
+    sensors: &[Sensor],
+    x_range: RangeInclusive<i64>,
+    mut y_range: RangeInclusive<i64>,
+) -> Option<Position> {
+    y_range.find_map(|y| empty_space_on_row(sensors, y, x_range.clone()))
 }
 
 fn get_tuning_frequency(position: Position) -> i64 {
