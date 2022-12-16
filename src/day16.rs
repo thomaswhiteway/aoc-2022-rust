@@ -9,7 +9,10 @@ use nom::{
     sequence::{preceded, terminated, tuple},
     IResult,
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+    cell::Cell,
+    collections::{HashMap, HashSet},
+};
 
 fn parse_input(input: &str) -> Result<Vec<Valve>, Error> {
     fn valve_name(input: &str) -> IResult<&str, String> {
@@ -53,7 +56,7 @@ impl Location {
     fn valve(&self) -> &str {
         match self {
             Location::At(loc) => loc.as_str(),
-            Self::EnRoute(loc, _) => loc.as_str()
+            Self::EnRoute(loc, _) => loc.as_str(),
         }
     }
 
@@ -63,7 +66,6 @@ impl Location {
             Location::EnRoute(_, t) => *t,
         }
     }
-
 }
 
 struct Distances(HashMap<String, HashMap<String, u64>>);
@@ -74,7 +76,12 @@ impl Distances {
     }
 
     fn min_distance(&self) -> u64 {
-        *self.0.iter().map(|(_, ds)| ds.values().filter(|dist| **dist > 0).min().unwrap()).min().unwrap()
+        *self
+            .0
+            .iter()
+            .map(|(_, ds)| ds.values().filter(|dist| **dist > 0).min().unwrap())
+            .min()
+            .unwrap()
     }
 }
 
@@ -84,20 +91,28 @@ struct State {
     time_left: u64,
     valves_opened: HashSet<String>,
     pressure_released: u64,
+    max_pressure: Cell<Option<u64>>,
 }
 
 fn all_location_combos(locations: &[Vec<Location>]) -> Vec<Vec<Location>> {
     if locations.len() == 1 {
         locations[0].iter().map(|loc| vec![loc.clone()]).collect()
     } else {
-        locations[0].iter().flat_map(|loc| all_location_combos(&locations[1..]).into_iter().filter_map(|mut locs| {
-            if locs.iter().all(|loc2| loc2.valve() != loc.valve()) {
-                locs.insert(0, loc.clone());
-                Some(locs)
-            } else {
-                None
-            }
-        })).collect()
+        locations[0]
+            .iter()
+            .flat_map(|loc| {
+                all_location_combos(&locations[1..])
+                    .into_iter()
+                    .filter_map(|mut locs| {
+                        if locs.iter().all(|loc2| loc2.valve() != loc.valve()) {
+                            locs.insert(0, loc.clone());
+                            Some(locs)
+                        } else {
+                            None
+                        }
+                    })
+            })
+            .collect()
     }
 }
 
@@ -105,57 +120,113 @@ impl State {
     fn successors(
         &self,
         valves: &HashMap<String, Valve>,
+        useful_valves: &[&Valve],
         distances: &Distances,
     ) -> Vec<State> {
-
-        let next_locations_per_actor = self.locations.iter().map(|location| {
-            if let Location::At(loc) = location {
-                valves
-                .values()
-                .filter(|valve| valve.flow_rate > 0 && !self.valves_opened.contains(&valve.name))
-                .map(|valve| Location::EnRoute(valve.name.clone(), distances.distance_between(loc, &valve.name) + 1))
-                .collect()
-            } else {
-                vec![location.clone()]
-            }
-        }).collect::<Vec<_>>();
+        let next_locations_per_actor = self
+            .locations
+            .iter()
+            .map(|location| {
+                if let Location::At(loc) = location {
+                    useful_valves
+                        .iter()
+                        .filter(|valve| {
+                            valve.flow_rate > 0 && !self.valves_opened.contains(&valve.name)
+                        })
+                        .map(|valve| {
+                            Location::EnRoute(
+                                valve.name.clone(),
+                                distances.distance_between(loc, &valve.name) + 1,
+                            )
+                        })
+                        .collect()
+                } else {
+                    vec![location.clone()]
+                }
+            })
+            .collect::<Vec<_>>();
 
         all_location_combos(&next_locations_per_actor)
             .into_iter()
             .filter_map(|next_locs| {
-                let time_needed = next_locs.iter().map(|loc| loc.time_remaining()).min().unwrap();
+                let time_needed = next_locs
+                    .iter()
+                    .map(|loc| loc.time_remaining())
+                    .min()
+                    .unwrap();
                 if self.time_left > time_needed {
                     let time_left = self.time_left - time_needed;
-                    let locations = next_locs.into_iter().map(|loc| match loc {
-                        Location::At(_) => panic!("Should be en-route"),
-                        Location::EnRoute(to, t) => if t <= time_needed  {
-                            Location::At(to)
-                        } else {
-                            Location::EnRoute(to, t - time_needed)
-                        }
-                    }).collect::<Vec<_>>();
+                    let locations = next_locs
+                        .into_iter()
+                        .map(|loc| match loc {
+                            Location::At(_) => panic!("Should be en-route"),
+                            Location::EnRoute(to, t) => {
+                                if t <= time_needed {
+                                    Location::At(to)
+                                } else {
+                                    Location::EnRoute(to, t - time_needed)
+                                }
+                            }
+                        })
+                        .collect::<Vec<_>>();
                     let mut valves_opened = self.valves_opened.clone();
                     for loc in locations.iter() {
                         if let Location::At(name) = loc {
                             valves_opened.insert(name.clone());
                         }
                     }
-                    let flow_rate = locations.iter().filter_map(|loc| if let Location::At(name) = loc {
-                        Some(valves.get(name).unwrap().flow_rate)
-                    } else {
-                        None
-                    }).sum::<u64>();
+                    let flow_rate = locations
+                        .iter()
+                        .filter_map(|loc| {
+                            if let Location::At(name) = loc {
+                                Some(valves.get(name).unwrap().flow_rate)
+                            } else {
+                                None
+                            }
+                        })
+                        .sum::<u64>();
                     Some(State {
                         locations,
                         time_left,
                         valves_opened,
                         pressure_released: self.pressure_released + time_left * flow_rate,
+                        max_pressure: Cell::new(None),
                     })
                 } else {
                     None
                 }
             })
             .collect()
+    }
+
+    fn max_total_pressure(&self, valves: &[&Valve], min_distance: u64) -> u64 {
+        if let Some(pressure) = self.max_pressure.get() {
+            return pressure;
+        }
+
+        let mut rem_valves = valves
+            .iter()
+            .filter(|valve| !self.valves_opened.contains(&valve.name))
+            .collect::<Vec<_>>();
+
+        let mut pressure_released = 0;
+        let mut time = self.time_left;
+
+        while time > min_distance + 1 {
+            for _ in self.locations.iter() {
+                if rem_valves.is_empty() {
+                    break;
+                }
+                pressure_released += rem_valves.remove(0).flow_rate * (time - 2);
+            }
+
+            time -= min_distance + 1;
+        }
+
+        self.max_pressure
+            .set(Some(self.pressure_released + pressure_released));
+
+        self.pressure_released + pressure_released
     }
 }
 
@@ -166,7 +237,8 @@ pub struct Valve {
 }
 
 fn calculate_distances<F>(valves: &HashMap<String, Valve>, include_valve: F) -> Distances
-    where F: Fn(&Valve) -> bool
+where
+    F: Fn(&Valve) -> bool,
 {
     let mut distances = HashMap::new();
     for valve in valves.values() {
@@ -189,41 +261,34 @@ fn calculate_distances<F>(valves: &HashMap<String, Valve>, include_valve: F) -> 
         distances.insert(valve.name.clone(), ds);
     }
 
-    Distances(distances.into_iter().filter_map(|(name, ds)| if include_valve(valves.get(&name).unwrap()) {
-        Some((name, ds.into_iter().filter(|(name, _)| include_valve(valves.get(name).unwrap())).collect()))
-    } else {
-        None
-    }).collect())
-}
-
-fn max_remaining_pressure(state: &State, valves: &[&Valve], min_distance: u64) -> u64 {
-    let mut rem_valves = valves
-        .iter()
-        .filter(|valve| !state.valves_opened.contains(&valve.name)).collect::<Vec<_>>();
-
-    let mut pressure_released = 0;
-    let mut time = state.time_left;
-
-    while time > min_distance + 1 {
-        for _ in state.locations.iter() {
-            if rem_valves.is_empty() {
-                break;
-            }
-            pressure_released += rem_valves.remove(0).flow_rate * (time - 2);
-        }
-
-        time -= min_distance + 1;
-    }
-
-    pressure_released
+    Distances(
+        distances
+            .into_iter()
+            .filter_map(|(name, ds)| {
+                if include_valve(valves.get(&name).unwrap()) {
+                    Some((
+                        name,
+                        ds.into_iter()
+                            .filter(|(name, _)| include_valve(valves.get(name).unwrap()))
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect(),
+    )
 }
 
 fn find_most_pressure(valves: &HashMap<String, Valve>, num_actors: usize, time_left: u64) -> u64 {
     let mut stack = vec![State {
-        locations: (0..num_actors).map(|_| Location::At("AA".to_string())).collect(),
+        locations: (0..num_actors)
+            .map(|_| Location::At("AA".to_string()))
+            .collect(),
         time_left,
         valves_opened: Default::default(),
         pressure_released: 0,
+        max_pressure: Cell::new(None),
     }];
 
     fn include_valve(valve: &Valve) -> bool {
@@ -235,12 +300,17 @@ fn find_most_pressure(valves: &HashMap<String, Valve>, num_actors: usize, time_l
     let distances = calculate_distances(valves, include_valve);
     let min_distance = distances.min_distance();
 
-    let mut sorted_valves: Vec<_> = valves.values().filter(|valve| include_valve(valve)).collect();
-    sorted_valves.sort_by(|a, b| a.flow_rate.cmp(&b.flow_rate).reverse());
+    let mut valves_by_flow_rate: Vec<_> = valves
+        .values()
+        .filter(|valve| include_valve(valve))
+        .collect();
+    valves_by_flow_rate.sort_by(|a, b| a.flow_rate.cmp(&b.flow_rate).reverse());
 
+    let mut count = 0;
     let mut best = 0;
     while let Some(state) = stack.pop() {
-        if state.pressure_released + max_remaining_pressure(&state, &sorted_valves, min_distance) <= best {
+        count += 1;
+        if state.max_total_pressure(&valves_by_flow_rate, min_distance) <= best {
             continue;
         }
 
@@ -248,12 +318,13 @@ fn find_most_pressure(valves: &HashMap<String, Valve>, num_actors: usize, time_l
             best = state.pressure_released;
         }
 
-        let mut successors = state.successors(valves, &distances);
-        successors.sort_by_key(|state| (state.pressure_released, state.time_left));
+        let mut successors = state.successors(valves, &valves_by_flow_rate, &distances);
+        successors.retain(|state| state.max_total_pressure(&valves_by_flow_rate, min_distance) > best);
+        successors.sort_by_key(|state| state.max_total_pressure(&valves_by_flow_rate, min_distance));
 
         stack.extend(successors);
     }
-
+    println!("visited {} states", count);
     best
 }
 
@@ -280,7 +351,7 @@ impl super::Solver for Solver {
 
 #[cfg(test)]
 mod test {
-    use super::{Location, all_location_combos};
+    use super::{all_location_combos, Location};
 
     #[test]
     fn test_location_combos() {
@@ -290,13 +361,16 @@ mod test {
         let loc_c = Location::EnRoute("C".to_string(), 4);
         let locations = vec![
             vec![loc_a.clone(), loc_b1.clone()],
-            vec![loc_b2.clone(), loc_c.clone()]
+            vec![loc_b2.clone(), loc_c.clone()],
         ];
 
-        assert_eq!(all_location_combos(&locations), vec![
-            vec![loc_a.clone(), loc_b2.clone()],
-            vec![loc_a.clone(), loc_c.clone()],
-            vec![loc_b1.clone(), loc_c.clone()],
-        ]);
+        assert_eq!(
+            all_location_combos(&locations),
+            vec![
+                vec![loc_a.clone(), loc_b2.clone()],
+                vec![loc_a.clone(), loc_c.clone()],
+                vec![loc_b1.clone(), loc_c.clone()],
+            ]
+        );
     }
 }
