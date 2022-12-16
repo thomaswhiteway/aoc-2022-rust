@@ -43,7 +43,7 @@ fn parse_input(input: &str) -> Result<Vec<Valve>, Error> {
         .map_err(|err| err_msg(format!("Failed to parse valves: {}", err)))
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum Location {
     At(String),
     EnRoute(String, u64),
@@ -71,6 +71,10 @@ struct Distances(HashMap<String, HashMap<String, u64>>);
 impl Distances {
     fn distance_between(&self, from: &str, to: &str) -> u64 {
         *self.0.get(from).unwrap().get(to).unwrap()
+    }
+
+    fn min_distance(&self) -> u64 {
+        *self.0.iter().map(|(_, ds)| ds.values().filter(|dist| **dist > 0).min().unwrap()).min().unwrap()
     }
 }
 
@@ -161,7 +165,9 @@ pub struct Valve {
     tunnels: Box<[String]>,
 }
 
-fn calculate_distances(valves: &HashMap<String, Valve>) -> Distances {
+fn calculate_distances<F>(valves: &HashMap<String, Valve>, include_valve: F) -> Distances
+    where F: Fn(&Valve) -> bool
+{
     let mut distances = HashMap::new();
     for valve in valves.values() {
         let mut distance = 1;
@@ -183,10 +189,14 @@ fn calculate_distances(valves: &HashMap<String, Valve>) -> Distances {
         distances.insert(valve.name.clone(), ds);
     }
 
-    Distances(distances)
+    Distances(distances.into_iter().filter_map(|(name, ds)| if include_valve(valves.get(&name).unwrap()) {
+        Some((name, ds.into_iter().filter(|(name, _)| include_valve(valves.get(name).unwrap())).collect()))
+    } else {
+        None
+    }).collect())
 }
 
-fn max_remaining_pressure(state: &State, valves: &[&Valve]) -> u64 {
+fn max_remaining_pressure(state: &State, valves: &[&Valve], min_distance: u64) -> u64 {
     let mut rem_valves = valves
         .iter()
         .filter(|valve| !state.valves_opened.contains(&valve.name)).collect::<Vec<_>>();
@@ -194,7 +204,7 @@ fn max_remaining_pressure(state: &State, valves: &[&Valve]) -> u64 {
     let mut pressure_released = 0;
     let mut time = state.time_left;
 
-    while time > 2 {
+    while time > min_distance + 1 {
         for _ in state.locations.iter() {
             if rem_valves.is_empty() {
                 break;
@@ -202,20 +212,7 @@ fn max_remaining_pressure(state: &State, valves: &[&Valve]) -> u64 {
             pressure_released += rem_valves.remove(0).flow_rate * (time - 2);
         }
 
-        time -= 2;
-    }
-
-    for location in state.locations.iter() {
-        if let Location::At(name) = location {
-            if !state.valves_opened.contains(name) {
-                pressure_released += valves
-                .iter()
-                .find(|valve| valve.name.as_str() == name)
-                .unwrap()
-                .flow_rate
-                * (state.time_left - 1)
-            }
-        }
+        time -= min_distance + 1;
     }
 
     pressure_released
@@ -229,23 +226,26 @@ fn find_most_pressure(valves: &HashMap<String, Valve>, num_actors: usize, time_l
         pressure_released: 0,
     }];
 
-    let mut sorted_valves: Vec<_> = valves.values().collect();
-    sorted_valves.sort_by(|a, b| a.flow_rate.cmp(&b.flow_rate).reverse());
+    fn include_valve(valve: &Valve) -> bool {
+        valve.name == "AA" || valve.flow_rate > 0
+    }
 
-    let distances = calculate_distances(valves);
+    assert!(valves.get("AA").unwrap().flow_rate == 0);
+
+    let distances = calculate_distances(valves, include_valve);
+    let min_distance = distances.min_distance();
+
+    let mut sorted_valves: Vec<_> = valves.values().filter(|valve| include_valve(valve)).collect();
+    sorted_valves.sort_by(|a, b| a.flow_rate.cmp(&b.flow_rate).reverse());
 
     let mut best = 0;
     while let Some(state) = stack.pop() {
-        if state.pressure_released + max_remaining_pressure(&state, &sorted_valves) <= best {
+        if state.pressure_released + max_remaining_pressure(&state, &sorted_valves, min_distance) <= best {
             continue;
         }
 
         if state.pressure_released > best {
             best = state.pressure_released;
-        }
-
-        if state.time_left <= 2 {
-            continue;
         }
 
         let mut successors = state.successors(valves, &distances);
