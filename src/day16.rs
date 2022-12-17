@@ -33,7 +33,7 @@ fn parse_input(input: &str) -> Result<Vec<Valve>, Error> {
             ),
         )),
         |(name, flow_rate, tunnels)| Valve {
-            name: name.to_string(),
+            name,
             flow_rate,
             tunnels: tunnels.into_boxed_slice(),
         },
