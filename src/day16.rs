@@ -319,8 +319,10 @@ fn find_most_pressure(valves: &HashMap<String, Valve>, num_actors: usize, time_l
         }
 
         let mut successors = state.successors(valves, &valves_by_flow_rate, &distances);
-        successors.retain(|state| state.max_total_pressure(&valves_by_flow_rate, min_distance) > best);
-        successors.sort_by_key(|state| state.max_total_pressure(&valves_by_flow_rate, min_distance));
+        successors
+            .retain(|state| state.max_total_pressure(&valves_by_flow_rate, min_distance) > best);
+        successors
+            .sort_by_key(|state| state.max_total_pressure(&valves_by_flow_rate, min_distance));
 
         stack.extend(successors);
     }
