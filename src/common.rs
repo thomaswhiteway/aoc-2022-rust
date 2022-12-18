@@ -1,8 +1,9 @@
 #![allow(unused)]
 
 use std::array;
+use std::fmt::Debug;
 use std::hash::Hash;
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Index, Mul, RangeInclusive, Sub};
 
 pub struct Vector<T, const S: usize>([T; S]);
 
@@ -52,6 +53,36 @@ impl<T: Add + Copy, const S: usize> Add for Vector<T, S> {
     type Output = Vector<T::Output, S>;
     fn add(self, rhs: Self) -> Self::Output {
         Vector(array::from_fn(move |i| self.0[i] + rhs.0[i]))
+    }
+}
+
+impl<T, const S: usize> Index<usize> for Vector<T, S> {
+    type Output = T;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl<T: PartialOrd, const S: usize> Vector<RangeInclusive<T>, S> {
+    pub fn contains(&self, position: &Vector<T, S>) -> bool {
+        self.0
+            .iter()
+            .zip(position.0.iter())
+            .all(|(range, d)| range.contains(d))
+    }
+}
+
+impl<T: Debug, const S: usize> Debug for Vector<T, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{")?;
+        for (index, element) in self.0.iter().enumerate() {
+            if index > 0 {
+                write!(f, ",")?;
+            }
+            element.fmt(f)?;
+        }
+
+        write!(f, "}}")
     }
 }
 
