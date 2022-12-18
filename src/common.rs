@@ -1,6 +1,59 @@
 #![allow(unused)]
 
+use std::array;
+use std::hash::Hash;
 use std::ops::{Add, Div, Mul, Sub};
+
+pub struct Vector<T, const S: usize>([T; S]);
+
+impl<T: Clone, const S: usize> Clone for Vector<T, S> {
+    fn clone(&self) -> Self {
+        Vector(self.0.clone())
+    }
+}
+
+impl<T: Hash, const S: usize> Hash for Vector<T, S> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
+    }
+}
+
+impl<T: PartialEq, const S: usize> PartialEq for Vector<T, S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<T: Eq, const S: usize> Eq for Vector<T, S> {}
+
+impl<const S: usize> Vector<i64, S> {
+    pub fn adjacent(&self) -> impl Iterator<Item = Vector<i64, S>> + '_ {
+        (0..S).flat_map(move |axis| {
+            [-1, 1].into_iter().map(move |offset| {
+                let mut pos = self.0;
+                pos[axis] += offset;
+                Vector(pos)
+            })
+        })
+    }
+
+    pub fn length(&self) -> i64 {
+        self.0.iter().map(|d| d.abs()).sum()
+    }
+}
+
+impl<T, const S: usize> From<[T; S]> for Vector<T, S> {
+    fn from(pos: [T; S]) -> Self {
+        Vector(pos)
+    }
+}
+
+impl<T: Add + Copy, const S: usize> Add for Vector<T, S> {
+    type Output = Vector<T::Output, S>;
+    fn add(self, rhs: Self) -> Self::Output {
+        Vector(array::from_fn(move |i| self.0[i] + rhs.0[i]))
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Position {
