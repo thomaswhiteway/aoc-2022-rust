@@ -199,3 +199,7 @@ impl Direction {
         }
     }
 }
+
+pub fn div_ceil(lhs: u64, rhs: u64) -> u64 {
+    (lhs / rhs) + if lhs % rhs == 0 { 0 } else { 1 }
+}
