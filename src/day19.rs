@@ -198,18 +198,8 @@ impl<T> ResourceArray<T> {
         }
     }
 
-    #[allow(unused)]
-    fn iter(&self) -> impl Iterator<Item = (Resource, &T)> + '_ {
-        Resource::all().zip(self.values.iter())
-    }
-
     fn values(&self) -> impl Iterator<Item = &T> + '_ {
         self.values.iter()
-    }
-
-    #[allow(unused)]
-    fn into_values(self) -> impl Iterator<Item = T> {
-        self.values.into_iter()
     }
 }
 
@@ -250,7 +240,7 @@ struct State<'a> {
     minutes_remaining: u64,
     resources: ResourceArray<u64>,
     num_robots: ResourceArray<u64>,
-    history: Vec<(u64, Resource)>
+    history: Vec<(u64, Resource)>,
 }
 
 impl<'a> Debug for State<'a> {
@@ -329,10 +319,6 @@ impl<'a> State<'a> {
         Some(state)
     }
 
-    fn advance_to(&self, minutes: u64) -> Option<Self> {
-        self.advance(minutes.checked_sub(self.minutes_passed)?)
-    }
-
     fn advance(&self, minutes: u64) -> Option<Self> {
         if minutes <= self.minutes_remaining {
             let resources = ResourceArray::from_fn(|resource| {
@@ -355,14 +341,6 @@ impl<'a> State<'a> {
     fn projected_resource_amount(&self, resource: Resource, minutes: u64) -> u64 {
         self.resources[resource] + minutes * self.num_robots[resource]
     }
-
-    fn better_than(&self, other: &Self) -> bool {
-        self.minutes_passed <= other.minutes_passed
-            && self
-                .advance_to(other.minutes_passed)
-                .map(|state| state.resources > other.resources)
-                .unwrap_or_default()
-    }
 }
 
 fn find_max_geodes(blueprint: &Blueprint, minutes: u64) -> u64 {
@@ -377,13 +355,14 @@ fn find_max_geodes(blueprint: &Blueprint, minutes: u64) -> u64 {
             // of a resource is X, then there's no point building more than X of that robot.
             // We always want to build geode robots.
             .filter(|&robot_type| {
-                robot_type == Resource::Geode || state.num_robots[robot_type] < blueprint.max_cost_for_robot(robot_type)
+                robot_type == Resource::Geode
+                    || state.num_robots[robot_type] < blueprint.max_cost_for_robot(robot_type)
             })
             // Can't build a robot if we can't produce all the resources for it.
             .filter(|&robot_type| state.have_prerequisites_for_robot(robot_type))
             .collect::<Vec<_>>();
 
-        let possible_states = possible_robot_types
+        let next_states = possible_robot_types
             .iter()
             .cloned()
             .filter_map(|robot_type| {
@@ -391,22 +370,10 @@ fn find_max_geodes(blueprint: &Blueprint, minutes: u64) -> u64 {
                     .time_until_ready_to_produce(robot_type)
                     .and_then(|minutes| state.advance(minutes))
                     .and_then(|before| {
-                        before
-                            .build_robot(robot_type)
-                            .map(|after| (robot_type, before, after))
+                        before.build_robot(robot_type)
+                        //.map(|after| (robot_type, before, after))
                     })
             })
-            .collect::<Vec<_>>();
-
-        let next_states = possible_states
-            .iter()
-            .filter(|(robot_type, before, _)| {
-                possible_states.iter().all(|(robot_type2, _, after2)| {
-                    robot_type == robot_type2 || !(after2.better_than(before))
-                })
-            })
-            .map(|(_, _, after)| after)
-            .cloned()
             .collect::<Vec<_>>();
 
         if next_states.is_empty() {
@@ -427,7 +394,10 @@ fn get_quality(blueprint: &Blueprint, minutes: u64) -> u64 {
 }
 
 fn total_quality(blueprints: &[Blueprint], minutes: u64) -> u64 {
-    blueprints.iter().map(|blueprint| get_quality(blueprint, minutes)).sum()
+    blueprints
+        .iter()
+        .map(|blueprint| get_quality(blueprint, minutes))
+        .sum()
 }
 
 pub struct Solver {}
@@ -441,7 +411,11 @@ impl super::Solver for Solver {
 
     fn solve(blueprints: Self::Problem) -> (Option<String>, Option<String>) {
         let part_one = total_quality(&blueprints, 24).to_string();
-        let part_two = blueprints[..3].iter().map(|blueprint| find_max_geodes(blueprint, 32)).product::<u64>().to_string();
+        let part_two = blueprints[..3]
+            .iter()
+            .map(|blueprint| find_max_geodes(blueprint, 32))
+            .product::<u64>()
+            .to_string();
         (Some(part_one), Some(part_two))
     }
 }
