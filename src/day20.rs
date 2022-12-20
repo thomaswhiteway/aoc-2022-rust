@@ -1,7 +1,9 @@
 use std::{
+    cmp::Ordering,
+    fmt::Display,
     iter::repeat,
     num::ParseIntError,
-    ops::{Index, IndexMut}, fmt::Display,
+    ops::{Index, IndexMut},
 };
 
 use failure::Error;
@@ -70,29 +72,30 @@ impl<T> IndexMut<isize> for CircularBuffer<T> {
 struct ModRange {
     start: usize,
     end: usize,
-    len: usize
+    len: usize,
 }
 
 impl ModRange {
     fn new(start: isize, end: isize, len: usize) -> Self {
-        ModRange { start: modulo(start, len), end: modulo(end, len), len: len }
+        ModRange {
+            start: modulo(start, len),
+            end: modulo(end, len),
+            len,
+        }
     }
     fn contains(&self, value: isize) -> bool {
         let value = modulo(value, self.len);
-        if self.end > self.start {
-            value >= self.start && value < self.end
-        } else if self.end < self.start {
-            value >= self.start || value < self.end
-        } else {
-            false
+        match self.end.cmp(&self.start) {
+            Ordering::Greater => value >= self.start && value < self.end,
+            Ordering::Less => value >= self.start || value < self.end,
+            Ordering::Equal => false,
         }
-
     }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 struct Permutation {
-    indices: Vec<usize>
+    indices: Vec<usize>,
 }
 
 impl From<Vec<usize>> for Permutation {
@@ -101,9 +104,19 @@ impl From<Vec<usize>> for Permutation {
     }
 }
 
+impl FromIterator<usize> for Permutation {
+    fn from_iter<T: IntoIterator<Item = usize>>(iter: T) -> Self {
+        Permutation {
+            indices: iter.into_iter().collect(),
+        }
+    }
+}
+
 impl Permutation {
     fn new(len: usize) -> Self {
-        Permutation { indices: (0..len).collect() }
+        Permutation {
+            indices: (0..len).collect(),
+        }
     }
 
     fn shift(&mut self, start_index: usize, diff: isize) {
@@ -113,15 +126,9 @@ impl Permutation {
 
         let new_index = current_index + diff % (len as isize - 1);
         let (shift_range, shift_offset) = if new_index < current_index {
-            (
-                ModRange::new(new_index, current_index, len),
-                1,
-            )
+            (ModRange::new(new_index, current_index, len), 1)
         } else {
-            (
-                ModRange::new(current_index+1, new_index+1, len),
-                -1,
-            )
+            (ModRange::new(current_index + 1, new_index + 1, len), -1)
         };
 
         for index in self.indices.iter_mut() {
@@ -145,33 +152,39 @@ impl Permutation {
         indices == (0..indices.len()).collect::<Vec<_>>()
     }
 
-    fn apply<T: Default + Clone>(
-        &self,
-        initial: &CircularBuffer<T>,
-    ) -> CircularBuffer<T> {
+    fn apply<T: Default + Clone>(&self, initial: &CircularBuffer<T>) -> CircularBuffer<T> {
         let mut end = repeat(T::default())
             .take(self.indices.len())
             .collect::<Vec<_>>();
         for (start_index, end_index) in self.indices.iter().enumerate() {
-            end[*end_index ] = initial[start_index as isize].clone()
+            end[*end_index] = initial[start_index as isize].clone()
         }
         end.into()
     }
-
 }
 
-fn mix(initial: &CircularBuffer<isize>) -> CircularBuffer<isize> {
+fn mix(initial: &CircularBuffer<isize>, num_times: usize) -> CircularBuffer<isize> {
     let mut permutation = Permutation::new(initial.len());
 
-    for (start_index, value) in initial.iter().enumerate() {
-        permutation.shift(start_index, *value);
+    for _ in 0..num_times {
+        for (start_index, value) in initial.iter().enumerate() {
+            permutation.shift(start_index, *value);
+        }
     }
 
     permutation.apply(initial)
 }
 
-fn get_grove_coordinates(values: &CircularBuffer<isize>) -> (isize, isize, isize) {
-    let end_values = mix(values);
+fn get_grove_coordinates(
+    start: &CircularBuffer<isize>,
+    decryption_key: Option<isize>,
+    num_times: usize,
+) -> (isize, isize, isize) {
+    let values = start
+        .iter()
+        .map(|val| val * decryption_key.unwrap_or(1))
+        .collect();
+    let end_values = mix(&values, num_times);
     let start_pos = end_values.iter().find_position(|x| **x == 0).unwrap().0 as isize;
     (
         end_values[start_pos + 1000],
@@ -192,9 +205,11 @@ impl super::Solver for Solver {
     }
 
     fn solve(values: Self::Problem) -> (Option<String>, Option<String>) {
-        let (x, y, z) = get_grove_coordinates(&values);
+        let (x, y, z) = get_grove_coordinates(&values, None, 1);
         let part_one = (x + y + z).to_string();
-        (Some(part_one), None)
+        let (x, y, z) = get_grove_coordinates(&values, Some(811589153), 10);
+        let part_two = (x + y + z).to_string();
+        (Some(part_one), Some(part_two))
     }
 }
 
