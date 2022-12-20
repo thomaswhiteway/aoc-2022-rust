@@ -365,9 +365,9 @@ impl<'a> State<'a> {
     }
 }
 
-fn find_max_geodes(blueprint: &Blueprint) -> u64 {
+fn find_max_geodes(blueprint: &Blueprint, minutes: u64) -> u64 {
     println!("Checking blueprint {}", blueprint.index);
-    let mut stack = vec![State::new(blueprint, 24)];
+    let mut stack = vec![State::new(blueprint, minutes)];
 
     let mut max_geodes = 0;
 
@@ -422,12 +422,12 @@ fn find_max_geodes(blueprint: &Blueprint) -> u64 {
     max_geodes
 }
 
-fn get_quality(blueprint: &Blueprint) -> u64 {
-    blueprint.index * find_max_geodes(blueprint)
+fn get_quality(blueprint: &Blueprint, minutes: u64) -> u64 {
+    blueprint.index * find_max_geodes(blueprint, minutes)
 }
 
-fn total_quality(blueprints: &[Blueprint]) -> u64 {
-    blueprints.iter().map(get_quality).sum()
+fn total_quality(blueprints: &[Blueprint], minutes: u64) -> u64 {
+    blueprints.iter().map(|blueprint| get_quality(blueprint, minutes)).sum()
 }
 
 pub struct Solver {}
@@ -440,8 +440,9 @@ impl super::Solver for Solver {
     }
 
     fn solve(blueprints: Self::Problem) -> (Option<String>, Option<String>) {
-        let part_one = total_quality(&blueprints).to_string();
-        (Some(part_one), None)
+        let part_one = total_quality(&blueprints, 24).to_string();
+        let part_two = blueprints[..3].iter().map(|blueprint| find_max_geodes(blueprint, 32)).product::<u64>().to_string();
+        (Some(part_one), Some(part_two))
     }
 }
 
