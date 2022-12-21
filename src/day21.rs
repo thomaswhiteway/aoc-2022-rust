@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
-use failure::Error;
+use failure::{err_msg, Error};
 
 use self::parse::parse_input;
 
@@ -34,7 +34,11 @@ mod parse {
     fn operation(input: &str) -> IResult<&str, Operation> {
         map(
             tuple((monkey, tag(" "), operator, tag(" "), monkey)),
-            |(left, _, op, _, right)| Operation { op, left, right },
+            |(left, _, op, _, right)| Operation {
+                op,
+                left: Box::new(Expression::Variable(left)),
+                right: Box::new(Expression::Variable(right)),
+            },
         )(input)
     }
 
@@ -72,6 +76,19 @@ pub enum Operator {
     Sub,
     Multiply,
     Divide,
+    Equals,
+}
+
+impl Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Operator::Add => write!(f, "+"),
+            Operator::Sub => write!(f, "-"),
+            Operator::Multiply => write!(f, "*"),
+            Operator::Divide => write!(f, "/"),
+            Operator::Equals => write!(f, "="),
+        }
+    }
 }
 
 impl Operator {
@@ -81,6 +98,17 @@ impl Operator {
             Operator::Sub => left - right,
             Operator::Multiply => left * right,
             Operator::Divide => left / right,
+            Operator::Equals => i64::from(left == right),
+        }
+    }
+
+    fn inverse(self) -> Self {
+        match self {
+            Operator::Add => Operator::Sub,
+            Operator::Sub => Operator::Add,
+            Operator::Multiply => Operator::Divide,
+            Operator::Divide => Operator::Multiply,
+            Operator::Equals => unimplemented!(),
         }
     }
 }
@@ -88,15 +116,124 @@ impl Operator {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Operation {
     op: Operator,
-    left: Monkey,
-    right: Monkey,
+    left: Box<Expression>,
+    right: Box<Expression>,
+}
+
+impl Display for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} {} {})", self.left, self.op, self.right)
+    }
 }
 
 impl Operation {
-    fn resolve(&self, values: &HashMap<Monkey, i64>) -> Option<i64> {
-        let left = *values.get(self.left.as_str())?;
-        let right = *values.get(self.right.as_str())?;
-        Some(self.op.apply(left, right))
+    fn expand(&self, expressions: &HashMap<Monkey, Expression>) -> Operation {
+        let left = Box::new(self.left.expand(expressions));
+        let right = Box::new(self.right.expand(expressions));
+        Operation {
+            op: self.op,
+            left,
+            right,
+        }
+    }
+
+    fn reduce(&self) -> Expression {
+        let left = self.left.reduce();
+        let right = self.right.reduce();
+
+        if let (Some(left), Some(right)) = (left.value(), right.value()) {
+            Expression::Value(self.op.apply(left, right))
+        } else {
+            Expression::Operation(Operation {
+                op: self.op,
+                left: Box::new(left),
+                right: Box::new(right),
+            })
+        }
+    }
+
+    fn normalize(&self) -> Expression {
+        let mut op = self.op;
+        let mut left = Box::new(self.left.normalize());
+        let mut right = Box::new(self.right.normalize());
+
+        match self.op {
+            Operator::Equals => {
+                while left
+                    .operation()
+                    .map(|operation| operation.right.is_value())
+                    .unwrap_or(false)
+                {
+                    let left_op = left.operation().unwrap().clone();
+                    left = left_op.left.clone();
+                    right = Box::new(
+                        Expression::Operation(Operation {
+                            op: left_op.op.inverse(),
+                            left: right,
+                            right: left_op.right,
+                        })
+                        .reduce(),
+                    );
+                }
+            }
+            Operator::Add => {
+                if self.left.is_value() {
+                    std::mem::swap(&mut left, &mut right);
+                }
+            }
+            Operator::Sub => {
+                op = Operator::Add;
+                right = Box::new(
+                    Expression::Operation(Operation {
+                        op: Operator::Multiply,
+                        left: right,
+                        right: Box::new(Expression::Value(-1)),
+                    })
+                    .reduce()
+                    .normalize(),
+                );
+            }
+            Operator::Multiply => {
+                if self.right.is_value() && self.left.is_operation() {
+                    let left_op = self.left.operation().unwrap();
+                    match left_op.op {
+                        Operator::Add | Operator::Sub => {
+                            op = left_op.op;
+                            left = Box::new(
+                                Operation {
+                                    op: Operator::Multiply,
+                                    left: left_op.left.clone(),
+                                    right: right.clone(),
+                                }
+                                .reduce()
+                                .normalize(),
+                            );
+                            right = Box::new(
+                                Operation {
+                                    op: Operator::Multiply,
+                                    left: left_op.right.clone(),
+                                    right: right.clone(),
+                                }
+                                .reduce()
+                                .normalize(),
+                            );
+                        }
+                        _ => {}
+                    }
+                } else if self.left.is_value() {
+                    std::mem::swap(&mut left, &mut right);
+                }
+            }
+            _ => {}
+        }
+
+        let expression = Expression::Operation(Operation { op, left, right });
+
+        if op != self.op {
+            expression.normalize()
+        } else {
+            expression
+        }
     }
 }
 
@@ -104,33 +241,139 @@ impl Operation {
 pub enum Expression {
     Value(i64),
     Operation(Operation),
+    Variable(Monkey),
 }
 
-impl Expression {
-    fn resolve(&self, values: &HashMap<Monkey, i64>) -> Option<i64> {
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expression::Value(value) => Some(*value),
-            Expression::Operation(operation) => operation.resolve(values),
+            Expression::Value(x) => write!(f, "{}", x),
+            Expression::Variable(monkey) => write!(f, "{}", monkey),
+            Expression::Operation(operation) => write!(f, "{}", operation),
         }
     }
 }
 
-fn what_does_the_monkey_shout(instructions: &[Instruction], target: Monkey) -> Option<i64> {
-    let mut values = HashMap::new();
-    let mut remaining = instructions.to_vec();
-
-    while !values.contains_key(&target) && !remaining.is_empty() {
-        remaining.retain(|(monkey, operation)| {
-            if let Some(value) = operation.resolve(&values) {
-                values.insert(monkey.clone(), value);
-                false
-            } else {
-                true
+impl Expression {
+    fn expand(&self, expressions: &HashMap<Monkey, Expression>) -> Self {
+        match self {
+            Expression::Value(_) => self.clone(),
+            Expression::Operation(operation) => {
+                Expression::Operation(operation.expand(expressions))
             }
-        });
+            Expression::Variable(monkey) => {
+                if let Some(expression) = expressions.get(monkey) {
+                    expression.expand(expressions)
+                } else {
+                    self.clone()
+                }
+            }
+        }
     }
 
-    values.get(&target).cloned()
+    fn reduce(&self) -> Self {
+        if let Expression::Operation(operation) = self {
+            operation.reduce()
+        } else {
+            self.clone()
+        }
+    }
+
+    fn normalize(&self) -> Self {
+        match self {
+            Expression::Operation(operation) => operation.normalize(),
+            _ => self.clone(),
+        }
+    }
+
+    fn is_value(&self) -> bool {
+        matches!(self, Expression::Value(_))
+    }
+
+    fn value(&self) -> Option<i64> {
+        if let Expression::Value(x) = self {
+            Some(*x)
+        } else {
+            None
+        }
+    }
+
+    fn is_operation(&self) -> bool {
+        matches!(self, Expression::Operation(_))
+    }
+
+    fn operation(&self) -> Option<&Operation> {
+        if let Expression::Operation(operation) = self {
+            Some(operation)
+        } else {
+            None
+        }
+    }
+
+    fn operation_mut(&mut self) -> Option<&mut Operation> {
+        if let Expression::Operation(operation) = self {
+            Some(operation)
+        } else {
+            None
+        }
+    }
+}
+
+fn what_does_the_monkey_shout(instructions: &[Instruction], target: Monkey) -> Result<i64, Error> {
+    let instructions = instructions.iter().cloned().collect::<HashMap<_, _>>();
+    let outcome = instructions
+        .get(&target)
+        .ok_or_else(|| err_msg("Failed to find target"))?
+        .expand(&instructions)
+        .reduce();
+
+    if let Some(x) = outcome.value() {
+        Ok(x)
+    } else {
+        Err(err_msg(format!("{} is not fully reduced", outcome)))
+    }
+}
+
+fn what_should_i_shout(
+    instructions: &[Instruction],
+    target: Monkey,
+    me: Monkey,
+) -> Result<i64, Error> {
+    let mut instructions = instructions.iter().cloned().collect::<HashMap<_, _>>();
+    instructions.remove(&me);
+    instructions
+        .get_mut(&target)
+        .ok_or_else(|| err_msg("Failed to find target"))?
+        .operation_mut()
+        .ok_or_else(|| err_msg("Target does not have an operation"))?
+        .op = Operator::Equals;
+
+    let reduced = instructions
+        .get(&target)
+        .ok_or_else(|| err_msg("Failed to find target"))?
+        .expand(&instructions)
+        .reduce();
+    let normalized = reduced.normalize();
+
+    let operation = normalized
+        .operation()
+        .ok_or_else(|| err_msg(format!("Not and operation: {}", normalized)))?;
+
+    if operation.op != Operator::Equals {
+        return Err(err_msg(format!("Not an equality: {}", operation)));
+    }
+
+    if *operation.left != Expression::Variable(me) {
+        return Err(err_msg(format!(
+            "Failed to normalize expression: {}",
+            operation
+        )));
+    }
+
+    operation
+        .right
+        .value()
+        .ok_or_else(|| err_msg(format!("Failed to normalize expression: {}", operation)))
 }
 
 pub struct Solver {}
@@ -146,6 +389,9 @@ impl super::Solver for Solver {
         let part_one = what_does_the_monkey_shout(&instructions, "root".to_string())
             .expect("Failed to solve part one")
             .to_string();
-        (Some(part_one), None)
+        let part_two = what_should_i_shout(&instructions, "root".to_string(), "humn".to_string())
+            .expect("Failed to solve part two")
+            .to_string();
+        (Some(part_one), Some(part_two))
     }
 }
