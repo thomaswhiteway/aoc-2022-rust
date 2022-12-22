@@ -93,6 +93,15 @@ pub struct Position {
 }
 
 impl Position {
+    pub fn step(self, direction: Direction) -> Self {
+        self + match direction {
+            Direction::North => (0, -1).into(),
+            Direction::East => (1, 0).into(),
+            Direction::South => (0, 1).into(),
+            Direction::West => (-1, 0).into(),
+        }
+    }
+
     pub fn manhattan_distance_to(&self, other: &Self) -> u64 {
         self.x.abs_diff(other.x) + self.y.abs_diff(other.y)
     }
@@ -198,6 +207,25 @@ impl Direction {
             West => '<',
         }
     }
+
+    pub fn rotate(self, direction: Rotation) -> Self {
+        match (self, direction) {
+            (Direction::North, Rotation::Left) => Direction::West,
+            (Direction::East, Rotation::Left) => Direction::North,
+            (Direction::South, Rotation::Left) => Direction::East,
+            (Direction::West, Rotation::Left) => Direction::South,
+            (Direction::North, Rotation::Right) => Direction::East,
+            (Direction::East, Rotation::Right) => Direction::South,
+            (Direction::South, Rotation::Right) => Direction::West,
+            (Direction::West, Rotation::Right) => Direction::North,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Rotation {
+    Left,
+    Right,
 }
 
 pub fn div_ceil(lhs: u64, rhs: u64) -> u64 {
