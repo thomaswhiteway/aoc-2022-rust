@@ -1,9 +1,12 @@
 #![allow(unused)]
 
 use std::array;
+use std::cmp::{min, Ordering};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::ops::{Add, Div, Index, Mul, RangeInclusive, Sub};
+use std::ops::{Add, AddAssign, Div, Index, Mul, RangeInclusive, Sub};
+
+use failure::{err_msg, Error};
 
 pub struct Vector<T, const S: usize>([T; S]);
 
@@ -92,14 +95,17 @@ pub struct Position {
     pub y: i64,
 }
 
+pub struct Bounds {
+    pub top_left: Position,
+    pub width: u64,
+    pub height: u64,
+}
+
 impl Position {
+    pub const ORIGIN: Position = Position { x: 0, y: 0 };
+
     pub fn step(self, direction: Direction) -> Self {
-        self + match direction {
-            Direction::North => (0, -1).into(),
-            Direction::East => (1, 0).into(),
-            Direction::South => (0, 1).into(),
-            Direction::West => (-1, 0).into(),
-        }
+        self + direction.delta()
     }
 
     pub fn manhattan_distance_to(&self, other: &Self) -> u64 {
@@ -136,6 +142,36 @@ impl Position {
         let delta = diff / distance;
         (0..distance).map(move |index| self + delta * index)
     }
+
+    pub fn bounds(self, other: Position) -> Bounds {
+        Bounds {
+            top_left: Position {
+                x: min(self.x, other.x),
+                y: min(self.y, other.y),
+            },
+            width: self.x.abs_diff(other.x),
+            height: self.y.abs_diff(other.y),
+        }
+    }
+
+    pub fn rotate(self, rotation: Rotation) -> Position {
+        match (rotation.0 % 4) {
+            0 => self,
+            1 => Position {
+                x: self.y,
+                y: -self.x,
+            },
+            2 => Position {
+                x: -self.x,
+                y: -self.y,
+            },
+            3 => Position {
+                x: -self.y,
+                y: self.x,
+            },
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl From<(i64, i64)> for Position {
@@ -151,6 +187,13 @@ impl Add for Position {
             x: self.x + rhs.x,
             y: self.y + rhs.y,
         }
+    }
+}
+
+impl AddAssign for Position {
+    fn add_assign(&mut self, rhs: Self) {
+        self.x += rhs.x;
+        self.y += rhs.y;
     }
 }
 
@@ -192,6 +235,19 @@ pub enum Direction {
     West,
 }
 
+impl TryFrom<u8> for Direction {
+    type Error = Error;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Direction::North),
+            1 => Ok(Direction::East),
+            2 => Ok(Direction::South),
+            3 => Ok(Direction::West),
+            _ => Err(err_msg(format!("Invalid direction: {}", value))),
+        }
+    }
+}
+
 impl Direction {
     pub fn all() -> impl Iterator<Item = Self> {
         use Direction::*;
@@ -208,26 +264,55 @@ impl Direction {
         }
     }
 
-    pub fn rotate(self, direction: Rotation) -> Self {
-        match (self, direction) {
-            (Direction::North, Rotation::Left) => Direction::West,
-            (Direction::East, Rotation::Left) => Direction::North,
-            (Direction::South, Rotation::Left) => Direction::East,
-            (Direction::West, Rotation::Left) => Direction::South,
-            (Direction::North, Rotation::Right) => Direction::East,
-            (Direction::East, Rotation::Right) => Direction::South,
-            (Direction::South, Rotation::Right) => Direction::West,
-            (Direction::West, Rotation::Right) => Direction::North,
+    pub fn rotate(self, rot: Rotation) -> Self {
+        Direction::try_from((self as u8 + rot.0) % 4).unwrap()
+    }
+
+    pub fn rotation_to(self, direction: Direction) -> Rotation {
+        let d1 = self as u8;
+        let d2 = direction as u8;
+        Rotation(if d1 <= d2 { d2 - d1 } else { d2 + 4 - d1 })
+    }
+
+    pub fn opposite(self) -> Self {
+        self.rotate(Rotation::HALF)
+    }
+
+    pub fn delta(self) -> Position {
+        match self {
+            Direction::North => (0, -1).into(),
+            Direction::East => (1, 0).into(),
+            Direction::South => (0, 1).into(),
+            Direction::West => (-1, 0).into(),
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Rotation {
-    Left,
-    Right,
+pub struct Rotation(pub u8);
+
+impl Rotation {
+    pub const NONE: Rotation = Rotation(0);
+    pub const RIGHT: Rotation = Rotation(1);
+    pub const HALF: Rotation = Rotation(2);
+    pub const LEFT: Rotation = Rotation(3);
+
+    pub fn inverse(self) -> Rotation {
+        Rotation((4 - self.0) % 4)
+    }
 }
 
 pub fn div_ceil(lhs: u64, rhs: u64) -> u64 {
     (lhs / rhs) + if lhs % rhs == 0 { 0 } else { 1 }
+}
+
+pub fn int_sqrt(val: u64) -> Option<u64> {
+    for x in (0..) {
+        match (x * x).cmp(&val) {
+            Ordering::Equal => return Some(x),
+            Ordering::Greater => break,
+            _ => {}
+        }
+    }
+    None
 }
