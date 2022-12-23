@@ -304,7 +304,10 @@ impl<'a> State<'a> {
 
     fn build_robot(&self, robot_type: Resource) -> Option<Self> {
         let resources_needed = self.blueprint.resources_for_robot(robot_type);
-        if !(resources_needed <= self.resources) {
+        if !matches!(
+            resources_needed.partial_cmp(&self.resources),
+            Some(Ordering::Less) | Some(Ordering::Equal)
+        ) {
             return None;
         }
 
