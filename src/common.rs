@@ -121,6 +121,10 @@ impl Bounds {
             Some(bounds) => bounds.extend(other),
         }
     }
+
+    pub fn non_empty(&self) -> Option<&NonEmptyBounds> {
+        self.0.as_ref()
+    }
 }
 
 impl From<NonEmptyBounds> for Bounds {
@@ -157,6 +161,14 @@ impl NonEmptyBounds {
                 y: max(self.bottom_right.y, other.y),
             },
         }
+    }
+
+    pub fn iter_x(&self) -> impl Iterator<Item = i64> {
+        self.top_left.x..=self.bottom_right.x
+    }
+
+    pub fn iter_y(&self) -> impl Iterator<Item = i64> {
+        self.top_left.y..=self.bottom_right.y
     }
 }
 
