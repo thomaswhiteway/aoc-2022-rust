@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use std::array;
-use std::cmp::{min, Ordering};
+use std::cmp::{max, min, Ordering};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::ops::{Add, AddAssign, Div, Index, Mul, RangeInclusive, Sub};
@@ -95,10 +95,78 @@ pub struct Position {
     pub y: i64,
 }
 
-pub struct Bounds {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bounds(Option<NonEmptyBounds>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NonEmptyBounds {
     pub top_left: Position,
-    pub width: u64,
-    pub height: u64,
+    pub bottom_right: Position,
+}
+
+impl Bounds {
+    pub const EMPTY: Self = Bounds(None);
+
+    pub fn width(&self) -> i64 {
+        self.0.map(|bounds| bounds.width()).unwrap_or_default()
+    }
+
+    pub fn height(&self) -> i64 {
+        self.0.map(|bounds| bounds.height()).unwrap_or_default()
+    }
+
+    fn extend(&self, other: Position) -> NonEmptyBounds {
+        match self.0 {
+            None => other.into(),
+            Some(bounds) => bounds.extend(other),
+        }
+    }
+}
+
+impl From<NonEmptyBounds> for Bounds {
+    fn from(bounds: NonEmptyBounds) -> Self {
+        Bounds(Some(bounds))
+    }
+}
+
+impl<I: IntoIterator<Item = Position>> From<I> for Bounds {
+    fn from(iter: I) -> Self {
+        iter.into_iter().fold(Bounds::EMPTY, |bounds, position| {
+            bounds.extend(position).into()
+        })
+    }
+}
+
+impl NonEmptyBounds {
+    pub fn width(&self) -> i64 {
+        1 + self.bottom_right.x - self.top_left.x
+    }
+
+    pub fn height(&self) -> i64 {
+        1 + self.bottom_right.y - self.top_left.y
+    }
+
+    fn extend(&self, other: Position) -> Self {
+        NonEmptyBounds {
+            top_left: Position {
+                x: min(self.top_left.x, other.x),
+                y: min(self.top_left.y, other.y),
+            },
+            bottom_right: Position {
+                x: max(self.bottom_right.x, other.x),
+                y: max(self.bottom_right.y, other.y),
+            },
+        }
+    }
+}
+
+impl From<Position> for NonEmptyBounds {
+    fn from(position: Position) -> Self {
+        NonEmptyBounds {
+            top_left: position,
+            bottom_right: position,
+        }
+    }
 }
 
 impl Position {
@@ -119,6 +187,28 @@ impl Position {
                 x: self.x + dx,
                 y: self.y + dy,
             })
+    }
+
+    pub fn surrounding(&self) -> impl Iterator<Item = Position> + '_ {
+        (-1..=1).flat_map(move |dx| {
+            (-1..=1).filter_map(move |dy| {
+                let delta = Position { x: dx, y: dy };
+                if delta != Self::ORIGIN {
+                    Some(*self + delta)
+                } else {
+                    None
+                }
+            })
+        })
+    }
+
+    pub fn is_in_direction(&self, other: Position, direction: Direction) -> bool {
+        match direction {
+            Direction::North => other.y < self.y,
+            Direction::East => other.x > self.x,
+            Direction::South => other.y > self.y,
+            Direction::West => other.x < self.x,
+        }
     }
 
     pub fn direction_to(&self, other: &Self) -> Option<Direction> {
@@ -143,14 +233,16 @@ impl Position {
         (0..distance).map(move |index| self + delta * index)
     }
 
-    pub fn bounds(self, other: Position) -> Bounds {
-        Bounds {
+    pub fn bounds(self, other: Position) -> NonEmptyBounds {
+        NonEmptyBounds {
             top_left: Position {
                 x: min(self.x, other.x),
                 y: min(self.y, other.y),
             },
-            width: self.x.abs_diff(other.x),
-            height: self.y.abs_diff(other.y),
+            bottom_right: Position {
+                x: max(self.x, other.x),
+                y: max(self.y, other.y),
+            },
         }
     }
 
