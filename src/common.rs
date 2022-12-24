@@ -363,7 +363,7 @@ impl Direction {
         match self {
             North => '^',
             East => '>',
-            South => 'V',
+            South => 'v',
             West => '<',
         }
     }
@@ -388,6 +388,19 @@ impl Direction {
             Direction::East => (1, 0).into(),
             Direction::South => (0, 1).into(),
             Direction::West => (-1, 0).into(),
+        }
+    }
+}
+
+impl TryFrom<usize> for Direction {
+    type Error = Error;
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Direction::North),
+            1 => Ok(Direction::East),
+            2 => Ok(Direction::South),
+            3 => Ok(Direction::West),
+            _ => Err(err_msg(format!("Invalid direction: {}", value))),
         }
     }
 }

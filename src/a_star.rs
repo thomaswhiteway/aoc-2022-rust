@@ -4,6 +4,7 @@ use std::{collections::HashSet, fmt::Debug, hash::Hash};
 pub trait State: Sized + Eq + PartialEq + Hash {
     fn heuristic(&self) -> u64;
     fn successors(&self) -> Vec<(u64, Self)>;
+    fn is_end(&self) -> bool;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,7 +48,7 @@ impl<S: State> Hash for Entry<S> {
     }
 }
 
-pub fn solve<S: State + Clone + Debug>(start: S, end: S) -> Result<(u64, Vec<S>), HashSet<S>> {
+pub fn solve<S: State + Clone + Debug>(start: S) -> Result<(u64, Vec<S>), HashSet<S>> {
     let mut queue = PriorityQueue::new();
     let entry = Entry {
         cost: 0,
@@ -60,7 +61,7 @@ pub fn solve<S: State + Clone + Debug>(start: S, end: S) -> Result<(u64, Vec<S>)
     let mut visited = HashSet::new();
 
     while let Some((Entry { cost, state, route }, _)) = queue.pop() {
-        if state == end {
+        if state.is_end() {
             return Ok((cost, route));
         }
 

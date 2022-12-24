@@ -155,6 +155,10 @@ impl<'a> a_star::State for State<'a> {
             })
             .collect()
     }
+
+    fn is_end(&self) -> bool {
+        self.position == self.height_map.end
+    }
 }
 
 #[allow(unused)]
@@ -194,9 +198,8 @@ fn find_shortest_route_from(
     start: Position,
 ) -> Result<u64, HashSet<Position>> {
     let start = State::new(height_map, start);
-    let end = State::new(height_map, height_map.end);
 
-    a_star::solve(start, end)
+    a_star::solve(start)
         .map(|(distance, _route)| distance)
         .map_err(|visited| visited.into_iter().map(|state| state.position).collect())
 }
