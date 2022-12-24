@@ -26,7 +26,7 @@ impl Map {
         &self,
         direction: Direction,
         row_or_col: i64,
-        time: i64,
+        time: u64,
     ) -> impl Iterator<Item = i64> + '_ {
         let (modulo, offset) = match direction {
             Direction::North => (self.height, self.height - 1),
@@ -37,10 +37,10 @@ impl Map {
 
         self.blizzards_in_direction(direction, row_or_col)
             .iter()
-            .map(move |pos| (pos + time * offset) % modulo)
+            .map(move |pos| (pos + time as i64 * offset) % modulo)
     }
 
-    fn is_free_at_time(&self, position: Position, time: i64) -> bool {
+    fn is_free_at_time(&self, position: Position, time: u64) -> bool {
         if position == self.start || position == self.end {
             return true;
         }
@@ -117,7 +117,8 @@ impl FromStr for Map {
 struct State<'a> {
     map: &'a Map,
     position: Position,
-    time: i64,
+    target: Position,
+    time: u64,
 }
 
 impl<'a> PartialEq for State<'a> {
@@ -136,11 +137,11 @@ impl<'a> Hash for State<'a> {
 
 impl<'a> a_star::State for State<'a> {
     fn heuristic(&self) -> u64 {
-        self.position.manhattan_distance_to(&self.map.end)
+        self.position.manhattan_distance_to(&self.target)
     }
 
     fn is_end(&self) -> bool {
-        self.position == self.map.end
+        self.position == self.target
     }
 
     fn successors(&self) -> Vec<(u64, Self)> {
@@ -154,6 +155,7 @@ impl<'a> a_star::State for State<'a> {
                         map: self.map,
                         position,
                         time,
+                        target: self.target
                     },
                 )
             })
@@ -161,13 +163,17 @@ impl<'a> a_star::State for State<'a> {
     }
 }
 
-fn find_quickest_route(map: &Map) -> Option<u64> {
-    let start = State {
-        map,
-        position: map.start,
-        time: 0,
-    };
-    a_star::solve(start).map(|(min_time, _)| min_time).ok()
+fn find_quickest_route(map: &Map, positions: &[Position]) -> Option<u64> {
+    positions.iter().zip(positions[1..].iter()).try_fold(0, |time, (&position, &target)| {
+        let start = State {
+            map,
+            position,
+            target,
+            time,
+        };
+        a_star::solve(start).map(|(min_time, _)| time + min_time)
+    }).ok()
+
 }
 
 pub struct Solver {}
@@ -180,10 +186,14 @@ impl super::Solver for Solver {
     }
 
     fn solve(map: Self::Problem) -> (Option<String>, Option<String>) {
-        let part_one = find_quickest_route(&map)
+        let part_one = find_quickest_route(&map, &[map.start, map.end])
             .expect("Failed to solve part one")
             .to_string();
-        (Some(part_one), None)
+
+        let part_two = find_quickest_route(&map, &[map.start, map.end, map.start, map.end])
+            .expect("Failed to solve part two")
+            .to_string();
+        (Some(part_one), Some(part_two))
     }
 }
 
