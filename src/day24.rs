@@ -44,7 +44,8 @@ impl Map {
         if position == self.start || position == self.end {
             return true;
         }
-        if position.x < 0 || position.y < 0 || position.x >= self.width || position.y >= self.height {
+        if position.x < 0 || position.y < 0 || position.x >= self.width || position.y >= self.height
+        {
             return false;
         }
         Direction::all().all(|direction| {
@@ -155,7 +156,7 @@ impl<'a> a_star::State for State<'a> {
                         map: self.map,
                         position,
                         time,
-                        target: self.target
+                        target: self.target,
                     },
                 )
             })
@@ -164,16 +165,19 @@ impl<'a> a_star::State for State<'a> {
 }
 
 fn find_quickest_route(map: &Map, positions: &[Position]) -> Option<u64> {
-    positions.iter().zip(positions[1..].iter()).try_fold(0, |time, (&position, &target)| {
-        let start = State {
-            map,
-            position,
-            target,
-            time,
-        };
-        a_star::solve(start).map(|(min_time, _)| time + min_time)
-    }).ok()
-
+    positions
+        .iter()
+        .zip(positions[1..].iter())
+        .try_fold(0, |time, (&position, &target)| {
+            let start = State {
+                map,
+                position,
+                target,
+                time,
+            };
+            a_star::solve(start).map(|(min_time, _)| time + min_time)
+        })
+        .ok()
 }
 
 pub struct Solver {}
@@ -197,11 +201,10 @@ impl super::Solver for Solver {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::Map;
-    use crate::common::{Position, Direction};
+    use crate::common::{Direction, Position};
     use std::collections::HashSet;
 
     #[test]
@@ -214,40 +217,47 @@ mod test {
 ######.#
 "#;
         let map: Map = map_string.parse().unwrap();
-        assert_eq!(map.start, Position { x: 0, y: -1});
-        assert_eq!(map.end, Position { x: 5, y: 4});
+        assert_eq!(map.start, Position { x: 0, y: -1 });
+        assert_eq!(map.end, Position { x: 5, y: 4 });
         assert_eq!(map.width, 6);
         assert_eq!(map.height, 4);
-        assert_eq!(map.blizzards, [
-            vec![
-                vec![].into_boxed_slice(),
-                vec![3].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![3].into_boxed_slice(),
-                vec![0, 3].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-            ].into_boxed_slice(),
-            vec![
-                vec![0, 1].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![0, 3, 5].into_boxed_slice(),
-                vec![5].into_boxed_slice(),
-            ].into_boxed_slice(),
-            vec![
-                vec![].into_boxed_slice(),
-                vec![2].into_boxed_slice(),
-                vec![3].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-                vec![].into_boxed_slice(),
-            ].into_boxed_slice(),
-            vec![
-                vec![3, 5].into_boxed_slice(),
-                vec![1, 4,5].into_boxed_slice(),
-                vec![4].into_boxed_slice(),
-                vec![0].into_boxed_slice(),
-            ].into_boxed_slice(),
-        ])
+        assert_eq!(
+            map.blizzards,
+            [
+                vec![
+                    vec![].into_boxed_slice(),
+                    vec![3].into_boxed_slice(),
+                    vec![].into_boxed_slice(),
+                    vec![3].into_boxed_slice(),
+                    vec![0, 3].into_boxed_slice(),
+                    vec![].into_boxed_slice(),
+                ]
+                .into_boxed_slice(),
+                vec![
+                    vec![0, 1].into_boxed_slice(),
+                    vec![].into_boxed_slice(),
+                    vec![0, 3, 5].into_boxed_slice(),
+                    vec![5].into_boxed_slice(),
+                ]
+                .into_boxed_slice(),
+                vec![
+                    vec![].into_boxed_slice(),
+                    vec![2].into_boxed_slice(),
+                    vec![3].into_boxed_slice(),
+                    vec![].into_boxed_slice(),
+                    vec![].into_boxed_slice(),
+                    vec![].into_boxed_slice(),
+                ]
+                .into_boxed_slice(),
+                vec![
+                    vec![3, 5].into_boxed_slice(),
+                    vec![1, 4, 5].into_boxed_slice(),
+                    vec![4].into_boxed_slice(),
+                    vec![0].into_boxed_slice(),
+                ]
+                .into_boxed_slice(),
+            ]
+        )
     }
 
     #[test]
@@ -260,17 +270,29 @@ mod test {
 ######.#
 "#;
         let map: Map = map_string.parse().unwrap();
-        let free: HashSet<Position> = (-1..).zip(map_string.lines()).flat_map(
-            |(y, line)| (-1..).zip(line.chars()).filter_map(move |(x, c)| if c == '.' { Some(Position { x, y})} else { None } )
-        ).collect();
+        let free: HashSet<Position> = (-1..)
+            .zip(map_string.lines())
+            .flat_map(|(y, line)| {
+                (-1..).zip(line.chars()).filter_map(move |(x, c)| {
+                    if c == '.' {
+                        Some(Position { x, y })
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
 
         for y in -1..5 {
             for x in -1..7 {
-                let position = Position {x, y};
+                let position = Position { x, y };
                 let is_free = map.is_free_at_time(position, 0);
                 let should_be_free = free.contains(&position);
                 if is_free != should_be_free {
-                    eprintln!("Position {:?} incorrect, should be free: {}, is free: {}", position, should_be_free, is_free);
+                    eprintln!(
+                        "Position {:?} incorrect, should be free: {}, is free: {}",
+                        position, should_be_free, is_free
+                    );
                     for direction in Direction::all() {
                         eprintln!("{:?}: {:?}", direction, map.blizzards[direction as usize]);
                     }
